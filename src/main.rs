@@ -1,6 +1,7 @@
 mod level;
 mod graphics;
 mod textures;
+mod level_graphics;
 
 mod prelude {
 	pub use glium::*;
@@ -15,7 +16,7 @@ fn main() {
 	......##..
 	H.........
 	......#...
-	..........
+	........$.
 	##.##.....
 	"#;
 	
@@ -30,7 +31,9 @@ fn main() {
 	let textures = textures::Textures::load("assets/", &display).unwrap();
 	
 	let mut level = level::Level::from_string(level).unwrap();
-	let mut graphics = graphics::Graphics::new(&display);
+	let mut graphics = graphics::Graphics::new(&display, textures);
+	let mut level_graphics = 
+		level_graphics::LevelGraphics::new(&graphics, &level);
 
 	events_loop.run(move |event, _, control_flow| {
 		use glutin::event::{Event, WindowEvent};
@@ -46,7 +49,8 @@ fn main() {
 
 		let mut frame = display.draw();
 		frame.clear_color(0.3, 0.3, 0.5, 1.0);
-		graphics.render_level(&display, &mut frame, &textures, aspect, &mut level);
+		level_graphics.render_level(&graphics, &mut frame, aspect, &mut level);
+		graphics.draw_texture_immediate(&mut frame, aspect, [-0.5, -0.5, 0.5, 0.5], textures::Texture::Human);
 		frame.finish().unwrap();
 	});
 }

@@ -7,7 +7,7 @@ pub enum Texture {
 	Wall = 0,
 	Floor = 1,
 	Home = 2,
-	Player = 3,
+	Human = 3,
 }
 
 pub struct Textures {

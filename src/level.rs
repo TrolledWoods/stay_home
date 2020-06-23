@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use crate::graphics::LevelGraphics;
 use std::collections::HashMap;
 
 pub struct Level {
@@ -11,8 +10,6 @@ pub struct Level {
 
 	entity_id_ctr: u32,
 	pub entities: HashMap<u32, Entity>,
-
-	pub graphics: Option<LevelGraphics>,
 }
 
 impl Level {
@@ -75,7 +72,6 @@ impl Level {
 			tiles,
 			entity_id_ctr,
 			entities,
-			graphics: None,
 		})
 	}
 }
@@ -105,12 +101,11 @@ pub struct Entity {
 	pub x: usize,
 	pub y: usize,
 	pub kind: EntityKind,
-	pub graphics: Option<()>,
 }
 
 impl Entity {
 	pub fn new(x: usize, y: usize, kind: EntityKind) -> Self {
-		Entity { x, y, kind, graphics: None }
+		Entity { x, y, kind }
 	}
 }
 

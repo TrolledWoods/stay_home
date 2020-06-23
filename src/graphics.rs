@@ -3,116 +3,77 @@ use crate::level::Tile;
 use crate::textures::{Textures, Texture as TextureId};
 
 pub struct Graphics {
-	level_program: Program,
+	pub world_texture_program: Program,
+	pub textures: Textures,
+	pub display: Display,
 }
 
 impl Graphics {
-	pub fn new(display: &Display) -> Graphics {
+	pub fn new(display: &Display, textures: Textures) -> Self {
 		Graphics {
-			level_program: Program::from_source(display, LEVEL_VERTEX_SHADER, LEVEL_FRAGMENT_SHADER, None).unwrap(),
+			world_texture_program: Program::from_source(display, TEXTURE_VERTEX_SHADER, TEXTURE_FRAGMENT_SHADER, None).unwrap(),
+			textures,
+			display: display.clone(),
 		}
 	}
 
-	pub fn render_level(
-		&mut self, 
-		display: &Display, 
-		surface: &mut impl Surface, 
-		textures: &Textures,
-		aspect: f32,
-		level: &mut Level,
-	) {
-		let mut graphics = level.graphics.take().unwrap_or_else(|| {
-			generate_level_graphics(display, level, textures)
-		});
+	pub fn draw_texture_immediate(&self, surface: &mut impl Surface, aspect: f32, rect: [f32; 4], texture: TextureId) {
+		let uv = self.textures.get_uv(texture);
+		let vertices = VertexBuffer::new(&self.display,
+			&[TextureVertex {
+				position: [rect[0], rect[1], 1.0],
+				uv: [uv.left, uv.bottom],
+			},
+			TextureVertex {
+				position: [rect[0], rect[3], 1.0],
+				uv: [uv.left, uv.top],
+			},
+			TextureVertex {
+				position: [rect[2], rect[3], 1.0],
+				uv: [uv.right, uv.top],
+			},
+			TextureVertex {
+				position: [rect[2], rect[1], 1.0],
+				uv: [uv.right, uv.bottom],
+			}]
+		).unwrap();
+		let indices = IndexBuffer::new(&self.display,
+			index::PrimitiveType::TrianglesList,
+			&[0, 1, 2, 0, 2, 3u32],
+		).unwrap();
 
 		surface.draw(
-			&graphics.vertices,
-			&graphics.indices,
-			&self.level_program,
+			&vertices,
+			&indices,
+			&self.world_texture_program,
 			&uniform! {
 				model_transform: [
 					[1.0, 0.0, 0.0f32],
 					[0.0, 1.0, 0.0f32],
-					[-(level.width as f32) / 2.0, -(level.height as f32) / 2.0, 1.0f32],
-				],
-				camera_transform: [
-					[1.0 / (level.height as f32 * aspect), 0.0, 0.0f32],
-					[0.0, 1.0 / (level.height as f32), 0.0f32],
 					[0.0, 0.0, 1.0f32],
 				],
-				atlas: textures.atlas.sampled().magnify_filter(uniforms::MagnifySamplerFilter::Nearest),
+				camera_transform: [
+					[1.0 / aspect, 0.0, 0.0f32],
+					[0.0, 1.0, 0.0f32],
+					[0.0, 0.0, 1.0f32],
+				],
+				atlas: self.textures.atlas.sampled().magnify_filter(uniforms::MagnifySamplerFilter::Nearest),
 			},
 			&Default::default(),
 		).unwrap();
-
-		level.graphics = Some(graphics);
-	}
-}
-
-pub struct LevelGraphics {
-	vertices: VertexBuffer<LevelVertex>,
-	indices: IndexBuffer<u32>,
-}
-
-fn generate_level_graphics(display: &Display, level: &Level, textures: &Textures) -> LevelGraphics {
-	let mut vertices = Vec::new();
-	let mut indices = Vec::new();
-
-	for (i, tile) in level.tiles.iter().copied().enumerate() {
-		let x = i % level.width;
-		let y = i / level.width;
-
-		let uv = textures.get_uv(match tile {
-			Tile::Floor => TextureId::Floor,
-			Tile::Home => TextureId::Home,
-			Tile::Wall => TextureId::Wall,
-		});
-		let vert_index = vertices.len() as u32;
-		vertices.push(LevelVertex {
-			position: [x as f32, y as f32, 1.0],
-			uv: [uv.left, uv.bottom],
-		});
-		vertices.push(LevelVertex {
-			position: [x as f32, y as f32 + 1.0, 1.0],
-			uv: [uv.left, uv.top],
-		});
-		vertices.push(LevelVertex {
-			position: [x as f32 + 1.0, y as f32 + 1.0, 1.0],
-			uv: [uv.right, uv.top],
-		});
-		vertices.push(LevelVertex {
-			position: [x as f32 + 1.0, y as f32, 1.0],
-			uv: [uv.right, uv.bottom],
-		});
-
-		indices.push(vert_index);
-		indices.push(vert_index + 1);
-		indices.push(vert_index + 2);
-
-		indices.push(vert_index);
-		indices.push(vert_index + 2);
-		indices.push(vert_index + 3);
 	}
 
-	LevelGraphics {
-		vertices: VertexBuffer::new(display, &vertices).unwrap(),
-		indices: IndexBuffer::new(
-			display, 
-			glium::index::PrimitiveType::TrianglesList, 
-			&indices,
-		).unwrap(),
-	}
 }
 
 #[derive(Clone, Copy)]
-pub struct LevelVertex {
+pub struct TextureVertex {
 	pub position: [f32; 3],
 	pub uv: [f32; 2],
 }
 
-implement_vertex!(LevelVertex, position, uv);
+implement_vertex!(TextureVertex, position, uv);
 
-const LEVEL_VERTEX_SHADER: &str = r##"
+const TEXTURE_VERTEX_SHADER: &str = r##"
 #version 150
 
 uniform mat3 model_transform;
@@ -128,7 +89,7 @@ void main() {
 }
 "##;
 
-const LEVEL_FRAGMENT_SHADER: &str = r##"
+const TEXTURE_FRAGMENT_SHADER: &str = r##"
 #version 150
 
 uniform sampler2D atlas;
