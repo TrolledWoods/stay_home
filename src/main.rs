@@ -2,6 +2,7 @@ mod level;
 mod graphics;
 mod textures;
 mod level_graphics;
+mod matrix;
 
 mod prelude {
 	pub use glium::*;
