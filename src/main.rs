@@ -36,7 +36,9 @@ fn main() {
 	let mut level_graphics = 
 		level_graphics::LevelGraphics::new(&graphics, &level);
 
+	let mut time = 0.0;
 	events_loop.run(move |event, _, control_flow| {
+		time += 0.1;
 		use glutin::event::{Event, WindowEvent};
 		match event {
 			Event::WindowEvent {
@@ -50,8 +52,7 @@ fn main() {
 
 		let mut frame = display.draw();
 		frame.clear_color(0.3, 0.3, 0.5, 1.0);
-		level_graphics.render_level(&graphics, &mut frame, aspect, &mut level);
-		graphics.draw_texture_immediate(&mut frame, aspect, [-0.5, -0.5, 0.5, 0.5], textures::Texture::Human);
+		level_graphics.render_level(&graphics, &mut frame, aspect, &mut level, time);
 		frame.finish().unwrap();
 	});
 }
