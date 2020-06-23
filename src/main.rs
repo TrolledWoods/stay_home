@@ -1,5 +1,7 @@
 mod level;
 mod graphics;
+mod textures;
+
 mod prelude {
 	pub use glium::*;
 	pub use crate::level::Level;
@@ -9,11 +11,14 @@ use prelude::*;
 
 fn main() {
 	let level = r#"
-	###
-	H$B
-	#C#
+	..........
+	......##..
+	H.........
+	......#...
+	..........
+	##.##.....
 	"#;
-
+	
 	let mut aspect = 1024.0 / 768.0;
     let mut events_loop = glium::glutin::event_loop::EventLoop::new();
     let wb = glium::glutin::window::WindowBuilder::new()
@@ -21,6 +26,8 @@ fn main() {
         .with_title("Making quarantine great again!!!!");
     let cb = glium::glutin::ContextBuilder::new();
     let display = glium::Display::new(wb, cb, &events_loop).unwrap();
+
+	let textures = textures::Textures::load("assets/", &display).unwrap();
 	
 	let mut level = level::Level::from_string(level).unwrap();
 	let mut graphics = graphics::Graphics::new(&display);
@@ -38,7 +45,8 @@ fn main() {
 		}
 
 		let mut frame = display.draw();
-		graphics.render_level(&display, &mut frame, aspect, &mut level);
+		frame.clear_color(0.3, 0.3, 0.5, 1.0);
+		graphics.render_level(&display, &mut frame, &textures, aspect, &mut level);
 		frame.finish().unwrap();
 	});
 }
