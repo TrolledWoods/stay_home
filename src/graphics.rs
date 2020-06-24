@@ -65,7 +65,16 @@ impl Graphics {
 				],
 				atlas: self.textures.atlas.sampled().magnify_filter(uniforms::MagnifySamplerFilter::Nearest),
 			},
-			&Default::default(),
+			&DrawParameters {
+				blend: Blend {
+					color: BlendingFunction::Addition {
+						source: LinearBlendingFactor::One,
+						destination: LinearBlendingFactor::OneMinusSourceAlpha,
+					},
+					..Default::default()
+				},
+				..Default::default()
+			}
 		).unwrap();
 	}
 

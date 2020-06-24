@@ -31,9 +31,9 @@ pub enum Input {
 
 fn main() {
 	let level = r#"
-	....@
-	..$..
-	H....
+	@$..HH
+	...#.$
+	...#..
 	"#;
 	
 	let mut aspect = 1024.0 / 768.0;

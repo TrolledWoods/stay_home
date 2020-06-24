@@ -6,6 +6,7 @@ use std::collections::{HashMap, VecDeque};
 
 pub struct LevelGraphics {
 	// camera_matrix: [f32; 9],
+	tilemap_change: u32,
 
 	vertices: VertexBuffer<TextureVertex>,
 	indices: IndexBuffer<u32>,
@@ -13,6 +14,8 @@ pub struct LevelGraphics {
 	pub animations: VecDeque<(f32, Event)>,
 
 	entities: HashMap<u32, EntityGraphics>,
+
+	win_panel_position: f32,
 }
 
 impl LevelGraphics {
@@ -24,19 +27,19 @@ impl LevelGraphics {
 			let uv = graphics.textures.get_uv(TextureId::Human);
 			let vertices = VertexBuffer::new(&graphics.display,
 				&[TextureVertex {
-					position: [0.0, 0.0, 1.0],
+					position: [-0.5, -0.5, 1.0],
 					uv: [uv.left, uv.bottom],
 				},
 				TextureVertex {
-					position: [0.0, 1.0, 1.0],
+					position: [-0.5, 0.5, 1.0],
 					uv: [uv.left, uv.top],
 				},
 				TextureVertex {
-					position: [1.0, 1.0, 1.0],
+					position: [0.5, 0.5, 1.0],
 					uv: [uv.right, uv.top],
 				},
 				TextureVertex {
-					position: [1.0, 0.0, 1.0],
+					position: [0.5, -0.5, 1.0],
 					uv: [uv.right, uv.bottom],
 				}]
 			).unwrap();
@@ -47,6 +50,7 @@ impl LevelGraphics {
 
 			entities.insert(*id, EntityGraphics {
 				position: [entity.x as f32, entity.y as f32],
+				size: 1.0,
 				vertex_buffer: vertices,
 				index_buffer: indices,
 			});
@@ -57,6 +61,8 @@ impl LevelGraphics {
 			indices,
 			entities,
 			animations: VecDeque::new(),
+			win_panel_position: 0.0,
+			tilemap_change: level.n_tile_changes,
 		}
 	}
 
@@ -66,8 +72,48 @@ impl LevelGraphics {
 		surface: &mut impl Surface, 
 		aspect: f32,
 		level: &mut Level,
-		delta_time: f32,
+		mut delta_time: f32,
 	) {
+		if level.has_won {
+			// Slow the animations down when you've won
+			delta_time *= 0.25;
+		}
+
+		self.animations.retain(|&(t, _)| t < 1.0);
+
+		let camera_matrix = [
+			[1.0 / (level.height as f32 * aspect), 0.0, 0.0f32],
+			[0.0, 1.0 / (level.height as f32), 0.0f32],
+			[0.0, 0.0, 1.0f32],
+		];
+
+		let model_transform = [
+			[1.0, 0.0, 0.0f32],
+			[0.0, 1.0, 0.0f32],
+			[-(level.width as f32) / 2.0, -(level.height as f32) / 2.0, 1.0f32],
+		];
+
+		// If the tilemap has changed, change the graphics too!
+		if self.tilemap_change < level.n_tile_changes {
+			let (vertices, indices) = generate_level_graphics(graphics, level);
+			self.vertices = vertices;
+			self.indices  = indices;
+			self.tilemap_change = level.n_tile_changes;
+		}
+
+		// Draw the tilemap
+		surface.draw(
+			&self.vertices,
+			&self.indices,
+			&graphics.world_texture_program,
+			&uniform! {
+				model_transform: model_transform,
+				camera_transform: camera_matrix,
+				atlas: graphics.textures.atlas.sampled().magnify_filter(uniforms::MagnifySamplerFilter::Nearest),
+			},
+			&Default::default(),
+		).unwrap();
+
 		// Animate stuff
 		let n_animations = self.animations.len();
 		for &mut (ref mut timer, event) in self.animations.iter_mut() {
@@ -87,52 +133,36 @@ impl LevelGraphics {
 					self.entities.get_mut(&entity_id).unwrap().position 
 						= [lerp_x, lerp_y];
 				}
+				Event::HomeSatisfied {
+					home_loc: [home_x, home_y],
+					satisfier,
+					from: [from_x, from_y],
+				} => {
+					let t = (*timer *  *timer) * (3.0 - 2.0 * *timer);
+					let lerp_x = lerp(from_x as f32, home_x as f32, t);
+					let lerp_y = lerp(from_y as f32, home_y as f32, t);
+
+					// @Cleanup: Don't unwrap here, dummy!
+					let mut entity =
+						self.entities.get_mut(&satisfier).unwrap();
+					entity.position = [lerp_x, lerp_y];
+					entity.size = 1.0 - t;
+				}
 				// Unanimated event
 				_ => ()
 			}
 		}
 
-		self.animations.retain(|&(t, _)| t < 1.0);
-
-		let camera_matrix = [
-			[1.0 / (level.height as f32 * aspect), 0.0, 0.0f32],
-			[0.0, 1.0 / (level.height as f32), 0.0f32],
-			[0.0, 0.0, 1.0f32],
-		];
-
-		let model_transform = [
-			[1.0, 0.0, 0.0f32],
-			[0.0, 1.0, 0.0f32],
-			[-(level.width as f32) / 2.0, -(level.height as f32) / 2.0, 1.0f32],
-		];
-
-		// Draw the tilemap
-		surface.draw(
-			&self.vertices,
-			&self.indices,
-			&graphics.world_texture_program,
-			&uniform! {
-				model_transform: model_transform,
-				camera_transform: camera_matrix,
-				atlas: graphics.textures.atlas.sampled().magnify_filter(uniforms::MagnifySamplerFilter::Nearest),
-			},
-			&Default::default(),
-		).unwrap();
-
 		for (&id, entity_graphics) in self.entities.iter() {
-			let entity_data = match level.entities.get(&id) {
-				Some(entity_data) => entity_data,
-				None => continue,
-			};
 			surface.draw(
 				&entity_graphics.vertex_buffer,
 				&entity_graphics.index_buffer,
 				&graphics.world_texture_program,
 				&uniform! {
 					model_transform: crate::matrix::matrix_mul(model_transform, [
-						[1.0, 0.0, 0.0],
-						[0.0, 1.0, 0.0],
-						[entity_graphics.position[0], entity_graphics.position[1], 1.0],
+						[entity_graphics.size, 0.0, 0.0],
+						[0.0, entity_graphics.size, 0.0],
+						[entity_graphics.position[0] + 0.5, entity_graphics.position[1] + 0.5, 1.0],
 					]),
 					camera_transform: camera_matrix,
 					atlas: graphics.textures.atlas.sampled().magnify_filter(uniforms::MagnifySamplerFilter::Nearest),
@@ -149,11 +179,33 @@ impl LevelGraphics {
 				}
 			).unwrap();
 		}
+
+		if level.has_won {
+			self.win_panel_position = 
+				1.0f32.min(self.win_panel_position + delta_time * 4.0);
+		}else {
+			self.win_panel_position = 
+				0.0f32.max(self.win_panel_position - delta_time * 4.0);
+		};
+
+		if self.win_panel_position > 0.05 {
+			let t = 1.0 - self.win_panel_position;
+			let t = 1.0 - (t * t);
+
+			let panel_y = lerp(-2.0, 0.0, t);
+			graphics.draw_texture_immediate(
+				surface, 
+				aspect, 
+				[-1.0, panel_y - 0.25, 1.0, panel_y + 0.25], 
+				TextureId::VictoryText,
+			);
+		}
 	}
 }
 
 struct EntityGraphics {
 	position: [f32; 2],
+	size: f32,
 	vertex_buffer: VertexBuffer<TextureVertex>,
 	index_buffer: IndexBuffer<u32>,
 }
@@ -173,6 +225,7 @@ fn generate_level_graphics(
 			Tile::Floor => TextureId::Floor,
 			Tile::Home => TextureId::Home,
 			Tile::Wall => TextureId::Wall,
+			Tile::HappyHome => TextureId::HappyHome,
 		});
 		let vert_index = vertices.len() as u32;
 		vertices.push(TextureVertex {

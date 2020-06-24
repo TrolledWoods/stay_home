@@ -8,6 +8,8 @@ pub enum Texture {
 	Floor = 1,
 	Home = 2,
 	Human = 3,
+	VictoryText = 4,
+	HappyHome = 5,
 }
 
 pub struct Textures {
@@ -27,6 +29,8 @@ impl Textures {
 			"floor.png",
 			"home.png",
 			"player.png",
+			"victory_text.png",
+			"happy_home.png",
 		];
 
 		let mut images = Vec::with_capacity(IMAGE_PATHS.len());
@@ -34,7 +38,7 @@ impl Textures {
 			println!("Loading texture '{}'", image_path);
 			let image = image::open(&folder.as_ref().join(image_path))
 				.map_err(|_| 
-					format!("Image 'wall.png' does not exist or is invalid")
+					format!("Image '{}' does not exist or is invalid", image_path)
 				)?.into_rgba();
 			let (width, height) = image.dimensions();
 			let image = 

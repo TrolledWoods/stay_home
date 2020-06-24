@@ -8,8 +8,12 @@ pub struct Level {
 	pub height: usize,
 	pub tiles: Vec<Tile>,
 
+	pub n_tile_changes: u32,
+
 	entity_id_ctr: u32,
 	pub entities: HashMap<u32, Entity>,
+
+	pub has_won: bool,
 
 	player_id: u32,
 }
@@ -48,10 +52,9 @@ impl Level {
 						}
 
 						entities.insert(entity_id_ctr, 
-							Entity::new(x, y, EntityKind::Human));
+							Entity::new(x, y, EntityKind::Player));
 						player_id = Some(entity_id_ctr);
 						entity_id_ctr += 1;
-						n_humans += 1;
 						Tile::Floor
 					}
 					'$' => {
@@ -91,6 +94,8 @@ impl Level {
 			entity_id_ctr,
 			entities,
 			player_id,
+			has_won: false,
+			n_tile_changes: 0,
 		})
 	}
 
@@ -121,10 +126,6 @@ impl Level {
 			Input::Confirm => (),
 		}
 
-		if self.tiles[x + y * self.width].is_solid() {
-			return false;
-		}
-
 		let mut moving_into = None;
 		for (&other_id, entity) in self.entities.iter() {
 			if other_id == id { continue; }
@@ -133,6 +134,30 @@ impl Level {
 				moving_into = Some(other_id);
 				break;
 			}
+		}
+
+		if entity.kind == EntityKind::Human && 
+			self.tiles[x + y * self.width] == Tile::Home
+		{
+			self.tiles[x + y * self.width] = Tile::HappyHome;
+			self.n_tile_changes += 1;
+
+			self.n_humans -= 1;
+			if self.n_humans == 0 {
+				self.has_won = true;
+			}
+
+			self.entities.remove(&id);
+			events.push_back(Event::HomeSatisfied {
+				home_loc: [x, y],
+				from: [old_x, old_y],
+				satisfier: id,
+			});
+			return true;
+		}
+
+		if self.tiles[x + y * self.width].is_solid() {
+			return false;
 		}
 
 		if let Some(moving_into) = moving_into {
@@ -173,12 +198,14 @@ pub enum Event {
 	HomeSatisfied {
 		home_loc: [usize; 2],
 		satisfier: u32,
+		from: [usize; 2],
 	}
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Tile {
 	Home,
+	HappyHome,
 	Floor,
 	Wall,
 }
@@ -187,7 +214,7 @@ impl Tile {
 	pub fn is_solid(&self) -> bool {
 		use Tile::*;
 		match self {
-			Wall => true,
+			Wall | HappyHome => true,
 			_ => false,
 		}
 	}
@@ -198,10 +225,11 @@ impl Tile {
 			Home => 0,
 			Floor => 1,
 			Wall => 2,
+			HappyHome => 3,
 		}
 	}
 
-	pub fn n_tiles() -> usize { 3 }
+	pub fn n_tiles() -> usize { 4 }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -217,8 +245,9 @@ impl Entity {
 	}
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EntityKind {
+	Player,
 	Human,
 	Block,
 	Cake,
