@@ -6,14 +6,26 @@ mod matrix;
 
 mod prelude {
 	pub use glium::*;
+	pub use glutin::event::{KeyboardInput, ElementState};
 	pub use crate::level::Level;
+	pub use crate::Input;
 }
 
 use prelude::*;
+use std::collections::{HashMap, VecDeque};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Input {
+	MoveLeft,
+	MoveRight,
+	MoveUp,
+	MoveDown,
+	Confirm,
+}
 
 fn main() {
 	let level = r#"
-	..........
+	....@.....
 	......##..
 	H.........
 	......#...
@@ -29,11 +41,20 @@ fn main() {
     let cb = glium::glutin::ContextBuilder::new();
     let display = glium::Display::new(wb, cb, &events_loop).unwrap();
 
+	let mut keybindings = HashMap::new();
+	keybindings.insert(72, Input::MoveUp);
+	keybindings.insert(75, Input::MoveLeft);
+	keybindings.insert(80, Input::MoveDown);
+	keybindings.insert(77, Input::MoveRight);
+	keybindings.insert(28, Input::Confirm);
+	keybindings.insert(57, Input::Confirm);
+
 	let mut graphics = graphics::Graphics::new(&display);
 	let mut level = level::Level::from_string(level).unwrap();
 	let mut level_graphics = 
 		level_graphics::LevelGraphics::new(&graphics, &level);
 
+	let mut events = VecDeque::new();
 	let mut time = 0.0;
 	events_loop.run(move |event, _, control_flow| {
 		time += 0.1;
@@ -44,6 +65,21 @@ fn main() {
 				..
 			} => {
 				aspect = size.width as f32 / size.height as f32;
+			}
+			Event::WindowEvent {
+				event: WindowEvent::KeyboardInput {
+					input: KeyboardInput { state, scancode, .. },
+					..
+				},
+				..
+			} => {
+				if let Some(&keybind) = keybindings.get(&scancode) {
+					if state == ElementState::Pressed {
+						level.input(keybind, &mut events);
+					}
+				}else {
+					println!("Unknown key scancode: '{}'", scancode);
+				}
 			}
 			_ => (),
 		}
