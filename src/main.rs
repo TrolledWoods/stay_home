@@ -29,10 +29,8 @@ fn main() {
     let cb = glium::glutin::ContextBuilder::new();
     let display = glium::Display::new(wb, cb, &events_loop).unwrap();
 
-	let textures = textures::Textures::load("assets/", &display).unwrap();
-	
+	let mut graphics = graphics::Graphics::new(&display);
 	let mut level = level::Level::from_string(level).unwrap();
-	let mut graphics = graphics::Graphics::new(&display, textures);
 	let mut level_graphics = 
 		level_graphics::LevelGraphics::new(&graphics, &level);
 

@@ -9,9 +9,15 @@ pub struct Graphics {
 }
 
 impl Graphics {
-	pub fn new(display: &Display, textures: Textures) -> Self {
+	pub fn new(display: &Display) -> Self {
+		println!("Compiling shaders...");
+		let world_texture_program = Program::from_source(display, TEXTURE_VERTEX_SHADER, TEXTURE_FRAGMENT_SHADER, None).unwrap();
+
+		println!("Loading textures...");
+		let textures = Textures::load("assets/", &display).unwrap();
+
 		Graphics {
-			world_texture_program: Program::from_source(display, TEXTURE_VERTEX_SHADER, TEXTURE_FRAGMENT_SHADER, None).unwrap(),
+			world_texture_program,
 			textures,
 			display: display.clone(),
 		}

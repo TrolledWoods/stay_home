@@ -31,6 +31,7 @@ impl Textures {
 
 		let mut images = Vec::with_capacity(IMAGE_PATHS.len());
 		for image_path in IMAGE_PATHS {
+			println!("Loading texture '{}'", image_path);
 			let image = image::open(&folder.as_ref().join(image_path))
 				.map_err(|_| 
 					format!("Image 'wall.png' does not exist or is invalid")
@@ -43,6 +44,7 @@ impl Textures {
 			images.push(image);
 		}
 
+		println!("Packing textures into atlas...");
 		let atlas = Texture2d::empty(display, total_width, total_height)
 			.unwrap();
 		let mut coords = Vec::with_capacity(images.len());
