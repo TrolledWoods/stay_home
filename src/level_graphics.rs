@@ -66,6 +66,47 @@ impl LevelGraphics {
 		}
 	}
 
+	pub fn reset(&mut self, graphics: &Graphics, level: &Level) {
+		let (vertices, indices) = generate_level_graphics(graphics, level);
+		self.vertices = vertices;
+		self.indices = indices;
+		self.entities.clear();
+		for (id, entity) in level.entities.iter() {
+			let uv = graphics.textures.get_uv(TextureId::Human);
+			let vertices = VertexBuffer::new(&graphics.display,
+				&[TextureVertex {
+					position: [-0.5, -0.5, 1.0],
+					uv: [uv.left, uv.bottom],
+				},
+				TextureVertex {
+					position: [-0.5, 0.5, 1.0],
+					uv: [uv.left, uv.top],
+				},
+				TextureVertex {
+					position: [0.5, 0.5, 1.0],
+					uv: [uv.right, uv.top],
+				},
+				TextureVertex {
+					position: [0.5, -0.5, 1.0],
+					uv: [uv.right, uv.bottom],
+				}]
+			).unwrap();
+			let indices = IndexBuffer::new(&graphics.display,
+				index::PrimitiveType::TrianglesList,
+				&[0, 1, 2, 0, 2, 3u32],
+			).unwrap();
+
+			self.entities.insert(*id, EntityGraphics {
+				position: [entity.x as f32, entity.y as f32],
+				size: 1.0,
+				vertex_buffer: vertices,
+				index_buffer: indices,
+			});
+		}
+		self.animations.clear();
+		self.tilemap_change = 0;
+	}
+
 	pub fn render_level(
 		&mut self, 
 		graphics: &Graphics,
@@ -117,14 +158,13 @@ impl LevelGraphics {
 		// Animate stuff
 		let n_animations = self.animations.len();
 		for &mut (ref mut timer, event) in self.animations.iter_mut() {
-			*timer = 1.0f32.min(*timer + delta_time * 7.0);
-
 			match event {
 				Event::EntityMoved {
 					entity_id,
 					from: [from_x, from_y],
 					to: [to_x, to_y],
 				} => {
+					*timer = 1.0f32.min(*timer + delta_time * 9.0);
 					let t = (*timer *  *timer) * (3.0 - 2.0 * *timer);
 					let lerp_x = lerp(from_x as f32, to_x as f32, t);
 					let lerp_y = lerp(from_y as f32, to_y as f32, t);
@@ -138,6 +178,7 @@ impl LevelGraphics {
 					satisfier,
 					from: [from_x, from_y],
 				} => {
+					*timer = 1.0f32.min(*timer + delta_time * 7.0);
 					let t = (*timer *  *timer) * (3.0 - 2.0 * *timer);
 					let lerp_x = lerp(from_x as f32, home_x as f32, t);
 					let lerp_y = lerp(from_y as f32, home_y as f32, t);
@@ -148,8 +189,21 @@ impl LevelGraphics {
 					entity.position = [lerp_x, lerp_y];
 					entity.size = 1.0 - t;
 				}
-				// Unanimated event
-				_ => ()
+				Event::MoveFailure {
+					entity_id,
+					from: [from_x, from_y],
+					to: [to_x, to_y],
+				} => {
+					*timer = 1.0f32.min(*timer + delta_time * 14.0);
+					let mut t = (*timer *  *timer) * (3.0 - 2.0 * *timer);
+					t = (0.5 - (t - 0.5).abs()) * 0.2;
+					let lerp_x = lerp(from_x as f32, to_x as f32, t);
+					let lerp_y = lerp(from_y as f32, to_y as f32, t);
+
+					// @Cleanup: Don't unwrap here, dummy!
+					self.entities.get_mut(&entity_id).unwrap().position 
+						= [lerp_x, lerp_y];
+				}
 			}
 		}
 

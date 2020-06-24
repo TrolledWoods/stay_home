@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use std::collections::{HashMap, VecDeque};
 
+#[derive(Clone)]
 pub struct Level {
 	pub n_humans: usize,
 
@@ -52,27 +53,27 @@ impl Level {
 						}
 
 						entities.insert(entity_id_ctr, 
-							Entity::new(x, y, EntityKind::Player));
+							Entity::new(x as isize, y as isize, EntityKind::Player));
 						player_id = Some(entity_id_ctr);
 						entity_id_ctr += 1;
 						Tile::Floor
 					}
 					'$' => {
 						entities.insert(entity_id_ctr, 
-							Entity::new(x, y, EntityKind::Human));
+							Entity::new(x as isize, y as isize, EntityKind::Human));
 						entity_id_ctr += 1;
 						n_humans += 1;
 						Tile::Floor
 					}
 					'B' => {
 						entities.insert(entity_id_ctr, 
-							Entity::new(x, y, EntityKind::Block));
+							Entity::new(x as isize, y as isize, EntityKind::Block));
 						entity_id_ctr += 1;
 						Tile::Floor
 					}
 					'C' => {
 						entities.insert(entity_id_ctr, 
-							Entity::new(x, y, EntityKind::Cake));
+							Entity::new(x as isize, y as isize, EntityKind::Cake));
 						entity_id_ctr += 1;
 						Tile::Floor
 					}
@@ -111,19 +112,29 @@ impl Level {
 		let mut x = entity.x;
 		let mut y = entity.y;
 		match input {
-			Input::MoveLeft => if entity.x > 0 {
+			Input::MoveLeft => {
 				x -= 1;
 			},
-			Input::MoveRight => if entity.x < self.width - 1 {
+			Input::MoveRight => {
 				x += 1;
 			},
-			Input::MoveDown => if entity.y > 0 {
+			Input::MoveDown => {
 				y -= 1;
 			},
-			Input::MoveUp => if entity.y < self.height - 1 {
+			Input::MoveUp => {
 				y += 1;
 			},
 			Input::Confirm => (),
+			Input::Restart => (),
+		}
+
+		if x < 0 || y < 0 || x >= self.width as isize || y >= self.height as isize {
+			events.push_back(Event::MoveFailure {
+				entity_id: id,
+				from: [old_x, old_y],
+				to: [x, y],
+			});
+			return false;
 		}
 
 		let mut moving_into = None;
@@ -137,9 +148,9 @@ impl Level {
 		}
 
 		if entity.kind == EntityKind::Human && 
-			self.tiles[x + y * self.width] == Tile::Home
+			self.tiles[x as usize + y as usize * self.width] == Tile::Home
 		{
-			self.tiles[x + y * self.width] = Tile::HappyHome;
+			self.tiles[x as usize + y as usize * self.width] = Tile::HappyHome;
 			self.n_tile_changes += 1;
 
 			self.n_humans -= 1;
@@ -156,33 +167,39 @@ impl Level {
 			return true;
 		}
 
-		if self.tiles[x + y * self.width].is_solid() {
+		if self.tiles[x as usize + y as usize * self.width].is_solid() {
+			events.push_back(Event::MoveFailure {
+				entity_id: id,
+				from: [old_x, old_y],
+				to: [x, y],
+			});
 			return false;
 		}
 
 		if let Some(moving_into) = moving_into {
 			// If that entity couldn't move, we can't either!
 			if !self.move_entity(moving_into, input, events) {
+				events.push_back(Event::MoveFailure {
+					entity_id: id,
+					from: [old_x, old_y],
+					to: [x, y],
+				});
 				return false;
 			}
 		}
 
-		if x != old_x || y != old_y {
-			println!("Entity {} moved!", id);
-			events.push_back(Event::EntityMoved {
-				entity_id: id,
-				from: [old_x, old_y],
-				to: [x, y],
-			});
+		println!("Entity {} moved!", id);
+		events.push_back(Event::EntityMoved {
+			entity_id: id,
+			from: [old_x, old_y],
+			to: [x, y],
+		});
 
-			let mut entity = self.entities.get_mut(&id).unwrap();
-			entity.x = x;
-			entity.y = y;
+		let mut entity = self.entities.get_mut(&id).unwrap();
+		entity.x = x;
+		entity.y = y;
 
-			true
-		} else {
-			false
-		}
+		true
 	}
 }
 
@@ -190,15 +207,18 @@ impl Level {
 pub enum Event {
 	EntityMoved {
 		entity_id: u32,
-		from: [usize; 2],
-		to: [usize; 2],
+		from: [isize; 2],
+		to: [isize; 2],
 	},
-	// TODO: Cause of death included for animation purposes?
-	EntityDeath(u32),
 	HomeSatisfied {
-		home_loc: [usize; 2],
+		home_loc: [isize; 2],
 		satisfier: u32,
-		from: [usize; 2],
+		from: [isize; 2],
+	},
+	MoveFailure {
+		entity_id: u32,
+		from: [isize; 2],
+		to: [isize; 2],
 	}
 }
 
@@ -234,13 +254,13 @@ impl Tile {
 
 #[derive(Clone, Copy, Debug)]
 pub struct Entity {
-	pub x: usize,
-	pub y: usize,
+	pub x: isize,
+	pub y: isize,
 	pub kind: EntityKind,
 }
 
 impl Entity {
-	pub fn new(x: usize, y: usize, kind: EntityKind) -> Self {
+	pub fn new(x: isize, y: isize, kind: EntityKind) -> Self {
 		Entity { x, y, kind }
 	}
 }

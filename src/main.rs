@@ -27,6 +27,7 @@ pub enum Input {
 	MoveUp,
 	MoveDown,
 	Confirm,
+	Restart,
 }
 
 fn main() {
@@ -51,9 +52,11 @@ fn main() {
 	keybindings.insert(77, Input::MoveRight);
 	keybindings.insert(28, Input::Confirm);
 	keybindings.insert(57, Input::Confirm);
+	keybindings.insert(19, Input::Restart); // 'R'
 
 	let mut graphics = graphics::Graphics::new(&display);
-	let mut level = level::Level::from_string(level).unwrap();
+	let original_level = level::Level::from_string(level).unwrap();
+	let mut level = original_level.clone();
 	let mut level_graphics = 
 		level_graphics::LevelGraphics::new(&graphics, &level);
 
@@ -67,6 +70,8 @@ fn main() {
 		let mut dt = (current_frame - previous_frame).as_micros() as f32 
 			/ 1_000_000.0;
 		previous_frame = current_frame;
+
+		*control_flow = glutin::event_loop::ControlFlow::WaitUntil(current_frame + std::time::Duration::from_millis(1));
 
 		use glutin::event::{Event, WindowEvent};
 		match event {
@@ -85,6 +90,12 @@ fn main() {
 			} => {
 				if let Some(&keybind) = keybindings.get(&scancode) {
 					if state == ElementState::Pressed {
+						if keybind == Input::Restart {
+							level = original_level.clone();
+							level_graphics
+								.reset(&mut graphics, &level);
+						}
+
 						cached_input = Some(keybind);
 					}
 				}else {
