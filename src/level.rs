@@ -95,33 +95,68 @@ impl Level {
 	}
 
 	pub fn input(&mut self, input: Input, events: &mut VecDeque<Event>) {
-		// @Cleanup: For now we expect the player is not dead...
-		let mut player = self.entities.get_mut(&self.player_id).unwrap();
-		let old_x = player.x;
-		let old_y = player.y;
+		self.move_entity(self.player_id, input, events);
+	}
+
+	fn move_entity(&mut self, id: u32, input: Input, events: &mut VecDeque<Event>) -> bool {
+		// @Cleanup: For now we expect the entity is not dead...
+		let mut entity = self.entities.get(&id).unwrap();
+		let old_x = entity.x;
+		let old_y = entity.y;
+		let mut x = entity.x;
+		let mut y = entity.y;
 		match input {
-			Input::MoveLeft => if player.x > 0 {
-				player.x -= 1;
+			Input::MoveLeft => if entity.x > 0 {
+				x -= 1;
 			},
-			Input::MoveRight => if player.x < self.width - 1 {
-				player.x += 1;
+			Input::MoveRight => if entity.x < self.width - 1 {
+				x += 1;
 			},
-			Input::MoveDown => if player.y > 0 {
-				player.y -= 1;
+			Input::MoveDown => if entity.y > 0 {
+				y -= 1;
 			},
-			Input::MoveUp => if player.y < self.height - 1 {
-				player.y += 1;
+			Input::MoveUp => if entity.y < self.height - 1 {
+				y += 1;
 			},
 			Input::Confirm => (),
 		}
 
-		if player.x != old_x || player.y != old_y {
-			println!("Player moved!");
+		if self.tiles[x + y * self.width].is_solid() {
+			return false;
+		}
+
+		let mut moving_into = None;
+		for (&other_id, entity) in self.entities.iter() {
+			if other_id == id { continue; }
+
+			if entity.x == x && entity.y == y {
+				moving_into = Some(other_id);
+				break;
+			}
+		}
+
+		if let Some(moving_into) = moving_into {
+			// If that entity couldn't move, we can't either!
+			if !self.move_entity(moving_into, input, events) {
+				return false;
+			}
+		}
+
+		if x != old_x || y != old_y {
+			println!("Entity {} moved!", id);
 			events.push_back(Event::EntityMoved {
-				entity_id: self.player_id,
+				entity_id: id,
 				from: [old_x, old_y],
-				to: [player.x, player.y],
+				to: [x, y],
 			});
+
+			let mut entity = self.entities.get_mut(&id).unwrap();
+			entity.x = x;
+			entity.y = y;
+
+			true
+		} else {
+			false
 		}
 	}
 }
@@ -149,6 +184,14 @@ pub enum Tile {
 }
 
 impl Tile {
+	pub fn is_solid(&self) -> bool {
+		use Tile::*;
+		match self {
+			Wall => true,
+			_ => false,
+		}
+	}
+
 	pub fn id(&self) -> usize {
 		use Tile::*;
 		match self {

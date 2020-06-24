@@ -70,8 +70,8 @@ impl LevelGraphics {
 	) {
 		// Animate stuff
 		let n_animations = self.animations.len();
-		if let Some(&mut (ref mut timer, event)) = self.animations.front_mut() {
-			*timer = 1.0f32.min(*timer + delta_time * n_animations as f32);
+		for &mut (ref mut timer, event) in self.animations.iter_mut() {
+			*timer = 1.0f32.min(*timer + delta_time * 7.0);
 
 			match event {
 				Event::EntityMoved {
@@ -79,8 +79,9 @@ impl LevelGraphics {
 					from: [from_x, from_y],
 					to: [to_x, to_y],
 				} => {
-					let lerp_x = lerp(from_x as f32, to_x as f32, *timer);
-					let lerp_y = lerp(from_y as f32, to_y as f32, *timer);
+					let t = (*timer *  *timer) * (3.0 - 2.0 * *timer);
+					let lerp_x = lerp(from_x as f32, to_x as f32, t);
+					let lerp_y = lerp(from_y as f32, to_y as f32, t);
 
 					// @Cleanup: Don't unwrap here, dummy!
 					self.entities.get_mut(&entity_id).unwrap().position 
@@ -89,11 +90,9 @@ impl LevelGraphics {
 				// Unanimated event
 				_ => ()
 			}
-
-			if *timer >= 1.0 {
-				self.animations.pop_front();
-			}
 		}
+
+		self.animations.retain(|&(t, _)| t < 1.0);
 
 		let camera_matrix = [
 			[1.0 / (level.height as f32 * aspect), 0.0, 0.0f32],

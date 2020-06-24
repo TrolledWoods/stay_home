@@ -12,12 +12,13 @@ mod prelude {
 	pub use crate::lerp;
 }
 
+use prelude::*;
+use std::collections::{HashMap, VecDeque};
+use std::time::Instant;
+
 pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
 	t * (b - a) + a
 }
-
-use prelude::*;
-use std::collections::{HashMap, VecDeque};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Input {
@@ -30,12 +31,9 @@ pub enum Input {
 
 fn main() {
 	let level = r#"
-	....@.....
-	......##..
-	H.........
-	......#...
-	........$.
-	##.##.....
+	....@
+	..$..
+	H....
 	"#;
 	
 	let mut aspect = 1024.0 / 768.0;
@@ -59,8 +57,17 @@ fn main() {
 	let mut level_graphics = 
 		level_graphics::LevelGraphics::new(&graphics, &level);
 
+	let mut cached_input = None;
+
+	let mut previous_frame = Instant::now();
+
 	let mut events = VecDeque::new();
 	events_loop.run(move |event, _, control_flow| {
+		let current_frame = Instant::now();
+		let mut dt = (current_frame - previous_frame).as_micros() as f32 
+			/ 1_000_000.0;
+		previous_frame = current_frame;
+
 		use glutin::event::{Event, WindowEvent};
 		match event {
 			Event::WindowEvent {
@@ -78,10 +85,7 @@ fn main() {
 			} => {
 				if let Some(&keybind) = keybindings.get(&scancode) {
 					if state == ElementState::Pressed {
-						level.input(keybind, &mut events);
-						for event in events.drain(..) {
-							level_graphics.animations.push_back((0.0, event));
-						}
+						cached_input = Some(keybind);
 					}
 				}else {
 					println!("Unknown key scancode: '{}'", scancode);
@@ -90,9 +94,18 @@ fn main() {
 			_ => (),
 		}
 
+		if level_graphics.animations.len() == 0 {
+			if let Some(input) = cached_input.take() {
+				level.input(input, &mut events);
+				for event in events.drain(..) {
+					level_graphics.animations.push_back((0.0, event));
+				}
+			}
+		}
+
 		let mut frame = display.draw();
 		frame.clear_color(0.3, 0.3, 0.5, 1.0);
-		level_graphics.render_level(&graphics, &mut frame, aspect, &mut level, 0.01);
+		level_graphics.render_level(&graphics, &mut frame, aspect, &mut level, dt);
 		frame.finish().unwrap();
 	});
 }
