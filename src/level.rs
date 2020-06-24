@@ -119,6 +119,7 @@ impl Level {
 			println!("Player moved!");
 			events.push_back(Event::EntityMoved {
 				entity_id: self.player_id,
+				from: [old_x, old_y],
 				to: [player.x, player.y],
 			});
 		}
@@ -129,6 +130,7 @@ impl Level {
 pub enum Event {
 	EntityMoved {
 		entity_id: u32,
+		from: [usize; 2],
 		to: [usize; 2],
 	},
 	// TODO: Cause of death included for animation purposes?

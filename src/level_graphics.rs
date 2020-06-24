@@ -2,13 +2,15 @@ use crate::prelude::*;
 use crate::level::Tile;
 use crate::graphics::{TextureVertex, Graphics};
 use crate::textures::Texture as TextureId;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 pub struct LevelGraphics {
 	// camera_matrix: [f32; 9],
 
 	vertices: VertexBuffer<TextureVertex>,
 	indices: IndexBuffer<u32>,
+
+	pub animations: VecDeque<(f32, Event)>,
 
 	entities: HashMap<u32, EntityGraphics>,
 }
@@ -44,6 +46,7 @@ impl LevelGraphics {
 			).unwrap();
 
 			entities.insert(*id, EntityGraphics {
+				position: [entity.x as f32, entity.y as f32],
 				vertex_buffer: vertices,
 				index_buffer: indices,
 			});
@@ -53,6 +56,7 @@ impl LevelGraphics {
 			vertices,
 			indices,
 			entities,
+			animations: VecDeque::new(),
 		}
 	}
 
@@ -62,8 +66,35 @@ impl LevelGraphics {
 		surface: &mut impl Surface, 
 		aspect: f32,
 		level: &mut Level,
-		time: f32,
+		delta_time: f32,
 	) {
+		// Animate stuff
+		let n_animations = self.animations.len();
+		if let Some(&mut (ref mut timer, event)) = self.animations.front_mut() {
+			*timer = 1.0f32.min(*timer + delta_time * n_animations as f32);
+
+			match event {
+				Event::EntityMoved {
+					entity_id,
+					from: [from_x, from_y],
+					to: [to_x, to_y],
+				} => {
+					let lerp_x = lerp(from_x as f32, to_x as f32, *timer);
+					let lerp_y = lerp(from_y as f32, to_y as f32, *timer);
+
+					// @Cleanup: Don't unwrap here, dummy!
+					self.entities.get_mut(&entity_id).unwrap().position 
+						= [lerp_x, lerp_y];
+				}
+				// Unanimated event
+				_ => ()
+			}
+
+			if *timer >= 1.0 {
+				self.animations.pop_front();
+			}
+		}
+
 		let camera_matrix = [
 			[1.0 / (level.height as f32 * aspect), 0.0, 0.0f32],
 			[0.0, 1.0 / (level.height as f32), 0.0f32],
@@ -73,7 +104,7 @@ impl LevelGraphics {
 		let model_transform = [
 			[1.0, 0.0, 0.0f32],
 			[0.0, 1.0, 0.0f32],
-			[-(level.width as f32) / 2.0, 4.0 * (time / 30.0).sin() -(level.height as f32) / 2.0, 1.0f32],
+			[-(level.width as f32) / 2.0, -(level.height as f32) / 2.0, 1.0f32],
 		];
 
 		// Draw the tilemap
@@ -102,18 +133,28 @@ impl LevelGraphics {
 					model_transform: crate::matrix::matrix_mul(model_transform, [
 						[1.0, 0.0, 0.0],
 						[0.0, 1.0, 0.0],
-						[entity_data.x as f32, entity_data.y as f32, 1.0],
+						[entity_graphics.position[0], entity_graphics.position[1], 1.0],
 					]),
 					camera_transform: camera_matrix,
 					atlas: graphics.textures.atlas.sampled().magnify_filter(uniforms::MagnifySamplerFilter::Nearest),
 				},
-				&Default::default(),
+				&DrawParameters {
+					blend: Blend {
+						color: BlendingFunction::Addition {
+							source: LinearBlendingFactor::One,
+							destination: LinearBlendingFactor::OneMinusSourceAlpha,
+						},
+						..Default::default()
+					},
+					..Default::default()
+				}
 			).unwrap();
 		}
 	}
 }
 
 struct EntityGraphics {
+	position: [f32; 2],
 	vertex_buffer: VertexBuffer<TextureVertex>,
 	index_buffer: IndexBuffer<u32>,
 }

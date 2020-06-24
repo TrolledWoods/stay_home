@@ -7,8 +7,13 @@ mod matrix;
 mod prelude {
 	pub use glium::*;
 	pub use glutin::event::{KeyboardInput, ElementState};
-	pub use crate::level::Level;
+	pub use crate::level::{Level, Event};
 	pub use crate::Input;
+	pub use crate::lerp;
+}
+
+pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
+	t * (b - a) + a
 }
 
 use prelude::*;
@@ -55,9 +60,7 @@ fn main() {
 		level_graphics::LevelGraphics::new(&graphics, &level);
 
 	let mut events = VecDeque::new();
-	let mut time = 0.0;
 	events_loop.run(move |event, _, control_flow| {
-		time += 0.1;
 		use glutin::event::{Event, WindowEvent};
 		match event {
 			Event::WindowEvent {
@@ -76,6 +79,9 @@ fn main() {
 				if let Some(&keybind) = keybindings.get(&scancode) {
 					if state == ElementState::Pressed {
 						level.input(keybind, &mut events);
+						for event in events.drain(..) {
+							level_graphics.animations.push_back((0.0, event));
+						}
 					}
 				}else {
 					println!("Unknown key scancode: '{}'", scancode);
@@ -86,7 +92,7 @@ fn main() {
 
 		let mut frame = display.draw();
 		frame.clear_color(0.3, 0.3, 0.5, 1.0);
-		level_graphics.render_level(&graphics, &mut frame, aspect, &mut level, time);
+		level_graphics.render_level(&graphics, &mut frame, aspect, &mut level, 0.01);
 		frame.finish().unwrap();
 	});
 }
