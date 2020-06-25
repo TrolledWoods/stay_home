@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use std::path::PathBuf;
-use std::collections::VecDeque;
 use std::fs;
 
 pub enum GameState {
@@ -10,10 +9,6 @@ pub enum GameState {
 }
 
 impl GameState {
-	pub fn new(graphics: &Graphics) -> Self {
-		GameState::PlayingLevel(todo!())
-	}
-
 	pub fn input(
 		&mut self,
 		graphics: &mut Graphics,
@@ -77,7 +72,7 @@ impl LevelPlayer {
 		-> Result<(), String> 
 	{
 		if input == Input::Restart {
-			self.reload_level(graphics);
+			self.reload_level(graphics)?;
 		}else if input == Input::Confirm && self.level.has_won {
 			if self.levels.len() > 0 {
 				self.level_path = self.levels.remove(0);
@@ -140,6 +135,7 @@ impl LevelPlayer {
 			aspect, 
 			&mut self.level, 
 			1.0f32.min(1.0 - self.update_timer),
+			dt,
 		);
 
 		Ok(())

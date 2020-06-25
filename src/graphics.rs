@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use crate::level::Tile;
 use crate::textures::{Textures, Texture as TextureId};
 
 pub struct Graphics {

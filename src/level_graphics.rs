@@ -5,7 +5,6 @@ use crate::textures::Texture as TextureId;
 use std::collections::{HashMap, VecDeque};
 
 pub struct LevelGraphics {
-	// camera_matrix: [f32; 9],
 	tilemap_change: u32,
 
 	vertices: VertexBuffer<TextureVertex>,
@@ -114,6 +113,7 @@ impl LevelGraphics {
 		aspect: f32,
 		level: &mut Level,
 		time: f32,
+		dt: f32,
 	) {
 		let camera_matrix = [
 			[1.0 / (level.height as f32 * aspect), 0.0, 0.0f32],
@@ -149,7 +149,6 @@ impl LevelGraphics {
 		).unwrap();
 
 		// Animate stuff
-		let n_animations = self.animations.len();
 		for event in self.animations.iter_mut() {
 			match *event {
 				Animation::Move {
@@ -167,8 +166,7 @@ impl LevelGraphics {
 				}
 				Animation::TileModification {
 					entity_id,
-					at: [at_x, at_y],
-					new_tile: _new_tile,
+					..
 				} => {
 					let t = (time * time) * (3.0 - 2.0 * time);
 
@@ -194,7 +192,7 @@ impl LevelGraphics {
 			}
 		}
 
-		for (&id, entity_graphics) in self.entities.iter() {
+		for entity_graphics in self.entities.values() {
 			surface.draw(
 				&entity_graphics.vertex_buffer,
 				&entity_graphics.index_buffer,
@@ -221,26 +219,26 @@ impl LevelGraphics {
 			).unwrap();
 		}
 
-		// if level.has_won {
-		// 	self.win_panel_position = 
-		// 		1.0f32.min(self.win_panel_position + delta_time * 4.0);
-		// }else {
-		// 	self.win_panel_position = 
-		// 		0.0f32.max(self.win_panel_position - delta_time * 4.0);
-		// };
+		if level.has_won {
+			self.win_panel_position = 
+				1.0f32.min(self.win_panel_position + dt * 4.0);
+		}else {
+			self.win_panel_position = 
+				0.0f32.max(self.win_panel_position - dt * 4.0);
+		};
 
-		// if self.win_panel_position > 0.05 {
-		// 	let t = 1.0 - self.win_panel_position;
-		// 	let t = 1.0 - (t * t);
+		if self.win_panel_position > 0.05 {
+			let t = 1.0 - self.win_panel_position;
+			let t = 1.0 - (t * t);
 
-		// 	let panel_y = lerp(-2.0, 0.0, t);
-		// 	graphics.draw_texture_immediate(
-		// 		surface, 
-		// 		aspect, 
-		// 		[-1.0, panel_y - 0.25, 1.0, panel_y + 0.25], 
-		// 		TextureId::VictoryText,
-		// 	);
-		// }
+			let panel_y = lerp(-2.0, 0.0, t);
+			graphics.draw_texture_immediate(
+				surface, 
+				aspect, 
+				[-1.0, panel_y - 0.25, 1.0, panel_y + 0.25], 
+				TextureId::VictoryText,
+			);
+		}
 	}
 }
 

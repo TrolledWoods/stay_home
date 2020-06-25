@@ -15,7 +15,7 @@ mod prelude {
 }
 
 use prelude::*;
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::time::Instant;
 
 pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
@@ -39,7 +39,7 @@ fn main() {
 	// ...#..
 	// "#;
 	let mut aspect = 1024.0 / 768.0;
-    let mut events_loop = glium::glutin::event_loop::EventLoop::new();
+    let events_loop = glium::glutin::event_loop::EventLoop::new();
     let wb = glium::glutin::window::WindowBuilder::new()
         .with_inner_size(glium::glutin::dpi::LogicalSize::new(1024.0, 768.0))
         .with_title("Making quarantine great again!!!!");
@@ -77,7 +77,7 @@ fn main() {
 	let mut previous_frame = Instant::now();
 	events_loop.run(move |event, _, control_flow| {
 		let current_frame = Instant::now();
-		let mut dt = (current_frame - previous_frame).as_micros() as f32 
+		let dt = (current_frame - previous_frame).as_micros() as f32 
 			/ 1_000_000.0;
 		previous_frame = current_frame;
 
@@ -116,7 +116,7 @@ fn main() {
 		}
 
 		let mut frame = display.draw();
-		state.render(&mut frame, &mut graphics, aspect, dt);
+		state.render(&mut frame, &mut graphics, aspect, dt).unwrap();
 		frame.finish().unwrap();
 	});
 }
