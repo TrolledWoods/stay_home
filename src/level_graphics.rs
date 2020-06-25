@@ -175,6 +175,20 @@ impl LevelGraphics {
 						self.entities.get_mut(&entity_id).unwrap();
 					entity.size = 1.0 - t;
 				}
+				Animation::IceKick {
+					entity_id,
+					from: [from_x, from_y],
+					to: [to_x, to_y],
+				} => {
+					let mut t = (time * time) * (3.0 - 2.0 * time);
+					t = (0.5 - (t - 0.5).abs()) * 1.3;
+					let lerp_x = lerp(from_x as f32, to_x as f32, t);
+					let lerp_y = lerp(from_y as f32, to_y as f32, t);
+
+					// @Cleanup: Don't unwrap here, dummy!
+					self.entities.get_mut(&entity_id).unwrap().position 
+						= [lerp_x, lerp_y];
+				}
 				Animation::FailedMove {
 					entity_id,
 					from: [from_x, from_y],

@@ -36,7 +36,8 @@ impl GameState {
 
 pub struct LevelPlayer {
 	level_path: PathBuf,
-	levels: Vec<PathBuf>,
+	levels: Vec<Level>,
+	current_level: usize,
 	level: Level,
 	level_graphics: LevelGraphics,
 	cached_input: Option<Input>,
@@ -46,18 +47,22 @@ pub struct LevelPlayer {
 }
 
 impl LevelPlayer {
-	pub fn new(mut levels: Vec<PathBuf>, graphics: &mut Graphics) 
+	pub fn new(level_path: PathBuf, graphics: &mut Graphics) 
 		-> Result<LevelPlayer, String> 
 	{
-		assert!(levels.len() > 0);
-		let level_path = levels.remove(0);
-		let level = Level::from_string(
+		let levels = Level::several_from_string(
 			&fs::read_to_string(&level_path)
 				.map_err(|v| v.to_string())?
 		).map_err(|v| v.to_string())?;
+		if levels.len() == 0 {
+			return Err(format!("You have to have at least 1 level!"));
+		}
+		// Levels go in the opposite direction
+		let level = levels[0].clone();
 		let level_graphics = LevelGraphics::new(graphics, &level);
 		Ok(LevelPlayer {
 			level_path,
+			current_level: 0,
 			levels,
 			level,
 			level_graphics,
@@ -74,8 +79,9 @@ impl LevelPlayer {
 		if input == Input::Restart {
 			self.reload_level(graphics)?;
 		}else if input == Input::Confirm && self.level.has_won {
+			self.current_level += 1;
+
 			if self.levels.len() > 0 {
-				self.level_path = self.levels.remove(0);
 				match self.reload_level(graphics) {
 					Ok(_) => (),
 					Err(err) => println!("Error going to next level: {}", err),
@@ -103,6 +109,16 @@ impl LevelPlayer {
 				fs::metadata(&self.level_path).map(|v| v.modified())
 			{
 				if self.previous_load != new_time {
+					self.previous_load = new_time;
+					let levels = Level::several_from_string(
+						&fs::read_to_string(&self.level_path)
+						.map_err(|v| v.to_string())?
+					).map_err(|v| v.to_string())?;
+					if levels.len() == 0 {
+						return Err(format!("You have to have at least 1 level!"));
+					}
+					self.levels = levels;
+
 					match self.reload_level(graphics) {
 						Ok(_) => (),
 						Err(msg) => 
@@ -142,15 +158,7 @@ impl LevelPlayer {
 	}
 
 	fn reload_level(&mut self, graphics: &mut Graphics) -> Result<(), String> {
-		if let Ok(Ok(new_time)) = 
-			fs::metadata(&self.level_path).map(|v| v.modified())
-		{
-			self.previous_load = new_time;
-		}
-		let level = Level::from_string(
-			&fs::read_to_string(&self.level_path)
-				.map_err(|v| v.to_string())?
-		).map_err(|v| v.to_string())?;
+		let level = self.levels[self.current_level].clone();
 		self.level_graphics
 			.reset(graphics, &level);
 		self.level = level;

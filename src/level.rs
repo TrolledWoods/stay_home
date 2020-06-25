@@ -2,7 +2,7 @@ use crate::prelude::*;
 use crate::textures::Texture;
 use std::collections::{HashMap, VecDeque};
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Level {
 	pub n_humans: usize,
 
@@ -24,6 +24,103 @@ pub struct Level {
 }
 
 impl Level {
+	pub fn several_from_string(input: &str) -> Result<Vec<Level>, String> {
+		let mut level: Level = Default::default();
+		let mut levels = Vec::new();
+		let mut making_level = false;
+		let mut has_player = false;
+
+		let lines = input.lines().rev().map(|v| v.trim());
+
+		let mut y = 0;
+		for line in lines {
+			if line.len() == 0 || line.starts_with("//") {
+				// If 
+				if making_level {
+					if !has_player {
+						return Err(format!("Expected player"));
+					}
+
+					levels.insert(
+						0,
+						std::mem::replace(&mut level, Default::default())
+					);
+					making_level = false;
+					has_player = false;
+				}
+
+				continue;
+			}
+
+			if making_level == false {
+				y = 0;
+			}
+
+			making_level = true;
+
+			if level.width == 0 { 
+				level.width = line.len(); 
+			}else if level.width != line.len() { 
+				return Err(format!("Expected the same width for every line")); 
+			}
+
+			level.height += 1;
+
+			for (x, char_) in line.chars().enumerate() {
+				level.tiles.push(match char_ {
+					// Entities
+					'@' => {
+						if has_player {
+							return 
+								Err(format!("Cannot have more than 1 player!"));
+						}
+
+						has_player = true;
+
+						level.entities.insert(level.entity_id_ctr, 
+							Entity::new(x as isize, y as isize, EntityKind::Player));
+						level.player_id = level.entity_id_ctr;
+						level.entity_id_ctr += 1;
+						Tile::Floor
+					}
+					'$' => {
+						level.entities.insert(level.entity_id_ctr, 
+							Entity::new(x as isize, y as isize, EntityKind::Human));
+						level.entity_id_ctr += 1;
+						level.n_humans += 1;
+						Tile::Floor
+					}
+					'B' => {
+						level.entities.insert(level.entity_id_ctr, 
+							Entity::new(x as isize, y as isize, EntityKind::Block));
+						level.entity_id_ctr += 1;
+						Tile::Floor
+					}
+					'C' => {
+						level.entities.insert(level.entity_id_ctr, 
+							Entity::new(x as isize, y as isize, EntityKind::Cake));
+						level.entity_id_ctr += 1;
+						Tile::Floor
+					}
+					'.' => Tile::Floor,
+					'#' => Tile::Wall,
+					'H' => Tile::Home,
+					'S' => Tile::SadHome,
+					'%' => Tile::Ice,
+					c => return Err(format!("Unknown character {}", c)),
+				});
+			}
+
+			y += 1;
+		}
+
+		if making_level {
+			levels.insert(0, level);
+		}
+
+		Ok(levels)
+	}
+
 	pub fn from_string(input: &str) -> Result<Level, String> {
 		let mut n_humans = 0;
 		let mut tiles = Vec::new();
@@ -117,10 +214,18 @@ impl Level {
 		}
 
 		let entity = self.entities.get(&self.player_id).unwrap();
+
+		let mut is_kicked = false;
+		match self.tiles[entity.x as usize + entity.y as usize * self.width] {
+			Tile::Ice => is_kicked = true,
+			_ => ()
+		}
+
 		self.active_events.moves.push(MoveEntity {
-			entity_id: self.player_id,
-			from: [entity.x, entity.y],
-			direction: input,
+			is_kicked,
+			can_ice_kick: true,
+			slides_without_kick: true,
+			..MoveEntity::new(self.player_id, [entity.x, entity.y], input)
 		});
 	}
 
@@ -173,7 +278,9 @@ impl Level {
 				new_tile: tile_modification.into,
 			});
 
-			if let Some(entity) = self.entities.remove(&tile_modification.sacrifice) {
+			if let Some(entity) = 
+				self.entities.remove(&tile_modification.sacrifice) 
+			{
 				if entity.kind == EntityKind::Human {
 					self.n_humans -= 1;
 					if self.n_humans == 0 {
@@ -190,23 +297,29 @@ impl Level {
 
 			if let Some(id) = self.get_entity_at_tile(move_.to()) {
 				match self.tiles[to[0] as usize + to[1] as usize * self.width] {
-					Tile::Ice => {
+					Tile::Ice if move_.can_ice_kick => {
+						animations.push_back(Animation::IceKick {
+							entity_id: move_.entity_id,
+							from: move_.from,
+							to,
+						});
+
 						let entity = self.entities.get(&id).unwrap();
-						events.moves[index] = MoveEntity {
-							entity_id: id,
-							from: [entity.x, entity.y],
-							direction: move_.direction,
-						};
+						events.moves.remove(index);
+						new_events.moves.push(MoveEntity {
+							can_ice_kick: true,
+							is_kicked: true,
+							..MoveEntity::new(id, [entity.x, entity.y], move_.direction)
+						});
 						continue;
 					},
 					_ => (),
 				}
-				
+
 				let entity = self.entities.get(&id).unwrap();
 				events.moves.push(MoveEntity {
-					entity_id: id,
-					from: [entity.x, entity.y],
-					direction: move_.direction,
+					can_ice_kick: true,
+					..MoveEntity::new(id, [entity.x, entity.y], move_.direction)
 				});
 			}
 
@@ -233,11 +346,12 @@ impl Level {
 
 			let entity = self.entities.get_mut(&move_.entity_id).unwrap();
 			match self.tiles[to[0] as usize + to[1] as usize * self.width] {
-				Tile::Ice => {
+				Tile::Ice if move_.is_kicked || move_.slides_without_kick => {
 					new_events.moves.push(MoveEntity {
-						entity_id: move_.entity_id,
-						from: to,
-						direction: move_.direction,
+						can_ice_kick: move_.can_ice_kick,
+						slides_without_kick: move_.slides_without_kick,
+						is_kicked: true,
+						..MoveEntity::new(move_.entity_id, to, move_.direction)
 					});
 				},
 				Tile::SadHome if entity.kind == EntityKind::Cake => {
@@ -274,12 +388,13 @@ impl Level {
 
 #[derive(Clone, Copy)]
 pub enum Animation {
-	Move { entity_id: u32, from: [isize; 2], to: [isize; 2] },
-	FailedMove { entity_id: u32, from: [isize; 2], to: [isize; 2] },
-	TileModification { entity_id: u32, at: [isize; 2], new_tile: Tile },
+	Move				{ entity_id: u32, from: [isize; 2], to: [isize; 2] },
+	IceKick				{ entity_id: u32, from: [isize; 2], to: [isize; 2] },
+	FailedMove			{ entity_id: u32, from: [isize; 2], to: [isize; 2] },
+	TileModification	{ entity_id: u32, at: [isize; 2], new_tile: Tile },
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Events {
 	pub moves: Vec<MoveEntity>,
 	pub tile_modifications: Vec<TileModification>,
@@ -300,9 +415,25 @@ impl Events {
 
 #[derive(Clone, Copy)]
 pub struct MoveEntity {
+	can_ice_kick: bool,
+	is_kicked: bool,
+	slides_without_kick: bool,
 	entity_id: u32,
 	from: [isize; 2],
 	direction: Input,
+}
+
+impl MoveEntity {
+	fn new(entity_id: u32, from: [isize; 2], direction: Input) -> Self {
+		MoveEntity {
+			entity_id,
+			from,
+			direction,
+			can_ice_kick: false,
+			slides_without_kick: false,
+			is_kicked: false,
+		}
+	}
 }
 
 impl MoveEntity {

@@ -1,0 +1,90 @@
+// Ice kicking
+// .......SH
+// .........
+// ...##.@..
+// ..#..#...
+// .$#$.#C..
+// ..%%%%%..
+// ..#####..
+
+// Basic tutorial
+.......
+.@.$.H.
+.......
+
+// Walking through empty home
+...#...
+.@.H.$.
+...#...
+
+// One thing before the other
+...#.H.
+.@.#...
+.$.H.$.
+...#...
+
+// Feed tape #1
+###H.
+H$$$.
+...@.
+....H
+
+// Wall stuff
+.@..
+$..H
+....
+..$.
+H.##
+
+// Roundabout
+###.H
+..#..
+.$#..
+.$##.
+.@...
+.#...
+##..H
+
+// Simple cake
+.........
+.@.C.S.$.
+.........
+
+// Even more cake stuff
+###.S.
+..$.$.
+.C@#..
+....#.
+.....H
+
+// Trouble!
+....#
+.@CSH
+.$$##
+...##
+
+// Complicate cake logic!
+.$..S
+.C.#.
+@.C$.
+....S
+
+// Cake feed tape!
+###H.
+..$$.
+.C...
+#..@S
+
+// Simple ice
+..%%..
+.@%%$.
+.H%%..
+
+// More complicated ice stuff
+...%.
+.$.%.
+.@#%.
+..C%C
+...%.
+###%#
+###S#
