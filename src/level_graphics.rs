@@ -160,19 +160,26 @@ impl LevelGraphics {
 		for &mut (ref mut timer, event) in self.animations.iter_mut() {
 			match event {
 				Event::EntityMoved {
+					time_offset,
 					entity_id,
 					from: [from_x, from_y],
 					to: [to_x, to_y],
 				} => {
 					*timer = 1.0f32.min(*timer + delta_time * 9.0);
-					let t = (*timer *  *timer) * (3.0 - 2.0 * *timer);
-					let lerp_x = lerp(from_x as f32, to_x as f32, t);
-					let lerp_y = lerp(from_y as f32, to_y as f32, t);
+					let mut t = *timer;
 
-					// @Cleanup: Don't unwrap here, dummy!
-					self.entities.get_mut(&entity_id).unwrap().position 
-						= [lerp_x, lerp_y];
+					if t > 0.0 {
+						t = (t *  t) * (3.0 - 2.0 * t);
+						let lerp_x = lerp(from_x as f32, to_x as f32, t);
+						let lerp_y = lerp(from_y as f32, to_y as f32, t);
+
+						// @Cleanup: Don't unwrap here, dummy!
+						self.entities.get_mut(&entity_id).unwrap().position 
+							= [lerp_x, lerp_y];
+					}
 				}
+				// TODO: Make the time offset thing more general, so that
+				// other events don't freak out with ice graphics
 				Event::HomeSatisfied {
 					home_loc: [home_x, home_y],
 					satisfier,
@@ -281,6 +288,7 @@ fn generate_level_graphics(
 			Tile::Wall => TextureId::Wall,
 			Tile::HappyHome => TextureId::HappyHome,
 			Tile::SadHome => TextureId::SadHome,
+			Tile::Ice => TextureId::Ice,
 		});
 		let vert_index = vertices.len() as u32;
 		vertices.push(TextureVertex {
