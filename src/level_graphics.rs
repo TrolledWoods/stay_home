@@ -24,7 +24,7 @@ impl LevelGraphics {
 
 		let mut entities = HashMap::new();
 		for (id, entity) in level.entities.iter() {
-			let uv = graphics.textures.get_uv(TextureId::Human);
+			let uv = graphics.textures.get_uv(entity.kind.get_texture());
 			let vertices = VertexBuffer::new(&graphics.display,
 				&[TextureVertex {
 					position: [-0.5, -0.5, 1.0],
@@ -72,7 +72,7 @@ impl LevelGraphics {
 		self.indices = indices;
 		self.entities.clear();
 		for (id, entity) in level.entities.iter() {
-			let uv = graphics.textures.get_uv(TextureId::Human);
+			let uv = graphics.textures.get_uv(entity.kind.get_texture());
 			let vertices = VertexBuffer::new(&graphics.display,
 				&[TextureVertex {
 					position: [-0.5, -0.5, 1.0],
@@ -280,6 +280,7 @@ fn generate_level_graphics(
 			Tile::Home => TextureId::Home,
 			Tile::Wall => TextureId::Wall,
 			Tile::HappyHome => TextureId::HappyHome,
+			Tile::SadHome => TextureId::SadHome,
 		});
 		let vert_index = vertices.len() as u32;
 		vertices.push(TextureVertex {

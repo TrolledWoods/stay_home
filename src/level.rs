@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use crate::textures::Texture;
 use std::collections::{HashMap, VecDeque};
 
 #[derive(Clone)]
@@ -30,10 +31,8 @@ impl Level {
 
 		let mut player_id = None;
 
-		for (y, line) in input.lines()
-			.map(|v| v.trim())
-			.filter(|v| !v.is_empty()) 
-			.enumerate()
+		let lines = input.lines().map(|v| v.trim()).take_while(|v| !v.is_empty()).collect::<Vec<_>>();
+		for (y, line) in lines.into_iter().rev().enumerate()
 		{
 			if width == 0 { 
 				width = line.len(); 
@@ -77,10 +76,10 @@ impl Level {
 						entity_id_ctr += 1;
 						Tile::Floor
 					}
-
 					'.' => Tile::Floor,
 					'#' => Tile::Wall,
 					'H' => Tile::Home,
+					'S' => Tile::SadHome,
 					c => return Err(format!("Unknown character {}", c)),
 				});
 			}
@@ -137,6 +136,15 @@ impl Level {
 			return false;
 		}
 
+		if self.tiles[x as usize + y as usize * self.width].is_solid() {
+			events.push_back(Event::MoveFailure {
+				entity_id: id,
+				from: [old_x, old_y],
+				to: [x, y],
+			});
+			return false;
+		}
+
 		let mut moving_into = None;
 		for (&other_id, entity) in self.entities.iter() {
 			if other_id == id { continue; }
@@ -145,6 +153,35 @@ impl Level {
 				moving_into = Some(other_id);
 				break;
 			}
+		}
+
+
+		if let Some(moving_into) = moving_into {
+			// If that entity couldn't move, we can't either!
+			if !self.move_entity(moving_into, input, events) {
+				events.push_back(Event::MoveFailure {
+					entity_id: id,
+					from: [old_x, old_y],
+					to: [x, y],
+				});
+				return false;
+			}
+		}
+
+		let entity = self.entities.get(&id).unwrap();
+		if entity.kind == EntityKind::Cake && 
+			self.tiles[x as usize + y as usize * self.width] == Tile::SadHome
+		{
+			self.tiles[x as usize + y as usize * self.width] = Tile::Home;
+			self.n_tile_changes += 1;
+
+			self.entities.remove(&id);
+			events.push_back(Event::HomeSatisfied {
+				home_loc: [x, y],
+				from: [old_x, old_y],
+				satisfier: id,
+			});
+			return true;
 		}
 
 		if entity.kind == EntityKind::Human && 
@@ -165,27 +202,6 @@ impl Level {
 				satisfier: id,
 			});
 			return true;
-		}
-
-		if self.tiles[x as usize + y as usize * self.width].is_solid() {
-			events.push_back(Event::MoveFailure {
-				entity_id: id,
-				from: [old_x, old_y],
-				to: [x, y],
-			});
-			return false;
-		}
-
-		if let Some(moving_into) = moving_into {
-			// If that entity couldn't move, we can't either!
-			if !self.move_entity(moving_into, input, events) {
-				events.push_back(Event::MoveFailure {
-					entity_id: id,
-					from: [old_x, old_y],
-					to: [x, y],
-				});
-				return false;
-			}
 		}
 
 		println!("Entity {} moved!", id);
@@ -210,6 +226,7 @@ pub enum Event {
 		from: [isize; 2],
 		to: [isize; 2],
 	},
+	// TODO: Make this just "EntityUsedOnTile" or something
 	HomeSatisfied {
 		home_loc: [isize; 2],
 		satisfier: u32,
@@ -226,6 +243,7 @@ pub enum Event {
 pub enum Tile {
 	Home,
 	HappyHome,
+	SadHome,
 	Floor,
 	Wall,
 }
@@ -246,6 +264,7 @@ impl Tile {
 			Floor => 1,
 			Wall => 2,
 			HappyHome => 3,
+			SadHome => 4,
 		}
 	}
 
@@ -271,4 +290,15 @@ pub enum EntityKind {
 	Human,
 	Block,
 	Cake,
+}
+
+impl EntityKind {
+	pub fn get_texture(&self) -> Texture {
+		match self {
+			EntityKind::Player => Texture::Player,
+			EntityKind::Human => Texture::Human,
+			EntityKind::Cake => Texture::Cake,
+			EntityKind::Block => Texture::Wall,
+		}
+	}
 }

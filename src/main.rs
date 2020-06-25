@@ -31,12 +31,11 @@ pub enum Input {
 }
 
 fn main() {
-	let level = r#"
-	@$..HH
-	...#.$
-	...#..
-	"#;
-	
+	// let level = r#"
+	// @$..HH
+	// ...#.$
+	// ...#..
+	// "#;
 	let mut aspect = 1024.0 / 768.0;
     let mut events_loop = glium::glutin::event_loop::EventLoop::new();
     let wb = glium::glutin::window::WindowBuilder::new()
@@ -54,9 +53,10 @@ fn main() {
 	keybindings.insert(57, Input::Confirm);
 	keybindings.insert(19, Input::Restart); // 'R'
 
+	let mut last_time_level_read = std::fs::metadata("level.txt").unwrap().modified().unwrap();
+
 	let mut graphics = graphics::Graphics::new(&display);
-	let original_level = level::Level::from_string(level).unwrap();
-	let mut level = original_level.clone();
+	let mut level = level::Level::from_string(&std::fs::read_to_string("level.txt").unwrap()).unwrap();
 	let mut level_graphics = 
 		level_graphics::LevelGraphics::new(&graphics, &level);
 
@@ -64,6 +64,9 @@ fn main() {
 
 	let mut previous_frame = Instant::now();
 
+	// @Cleanup: Make the level update checking
+	// much, much cleaner, this is horrendous!
+	let mut level_file_check_time = 0.0;
 	let mut events = VecDeque::new();
 	events_loop.run(move |event, _, control_flow| {
 		let current_frame = Instant::now();
@@ -91,7 +94,10 @@ fn main() {
 				if let Some(&keybind) = keybindings.get(&scancode) {
 					if state == ElementState::Pressed {
 						if keybind == Input::Restart {
-							level = original_level.clone();
+							match level::Level::from_string(&std::fs::read_to_string("level.txt").unwrap()) {
+								Ok(l) => level = l,
+								Err(err) => println!("Error in level: {:?}", err),
+							}
 							level_graphics
 								.reset(&mut graphics, &level);
 						}
@@ -103,6 +109,21 @@ fn main() {
 				}
 			}
 			_ => (),
+		}
+
+		level_file_check_time -= dt;
+		if level_file_check_time < 0.0 {
+			level_file_check_time = 0.5;
+			let new_time = std::fs::metadata("level.txt").unwrap().modified().unwrap();
+			if last_time_level_read != new_time {
+				match level::Level::from_string(&std::fs::read_to_string("level.txt").unwrap()) {
+					Ok(l) => level = l,
+					Err(err) => println!("Error in level: {:?}", err),
+				}
+				level_graphics
+					.reset(&mut graphics, &level);
+				last_time_level_read = new_time;
+			}
 		}
 
 		if level_graphics.animations.len() == 0 {
