@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::level::Tile;
+use crate::level::{Tile, Animation};
 use crate::graphics::{TextureVertex, Graphics};
 use crate::textures::Texture as TextureId;
 use std::collections::{HashMap, VecDeque};
@@ -11,7 +11,7 @@ pub struct LevelGraphics {
 	vertices: VertexBuffer<TextureVertex>,
 	indices: IndexBuffer<u32>,
 
-	pub animations: VecDeque<(f32, Event)>,
+	pub animations: VecDeque<Animation>,
 
 	entities: HashMap<u32, EntityGraphics>,
 
@@ -113,15 +113,8 @@ impl LevelGraphics {
 		surface: &mut impl Surface, 
 		aspect: f32,
 		level: &mut Level,
-		mut delta_time: f32,
+		time: f32,
 	) {
-		if level.has_won {
-			// Slow the animations down when you've won
-			delta_time *= 0.25;
-		}
-
-		self.animations.retain(|&(t, _)| t < 1.0);
-
 		let camera_matrix = [
 			[1.0 / (level.height as f32 * aspect), 0.0, 0.0f32],
 			[0.0, 1.0 / (level.height as f32), 0.0f32],
@@ -157,58 +150,45 @@ impl LevelGraphics {
 
 		// Animate stuff
 		let n_animations = self.animations.len();
-		// TODO: This bad!!!! Don't allocate more stuff
-		let mut new_animations = VecDeque::new();
-		for (timer, event) in self.animations.iter_mut() {
+		for event in self.animations.iter_mut() {
 			match *event {
-				Event::EntityMoved {
+				Animation::Move {
 					entity_id,
 					from: [from_x, from_y],
 					to: [to_x, to_y],
-					ref mut child_events,
 				} => {
-					*timer = 1.0f32.min(*timer + delta_time * 9.0);
-
-					let mut t = *timer;
-					t = (t *  t) * (3.0 - 2.0 * t);
+					let t = (time *  time) * (3.0 - 2.0 * time);
 					let lerp_x = lerp(from_x as f32, to_x as f32, t);
 					let lerp_y = lerp(from_y as f32, to_y as f32, t);
 
 					// @Cleanup: Don't unwrap here, dummy!
 					self.entities.get_mut(&entity_id).unwrap().position 
 						= [lerp_x, lerp_y];
-
-					if *timer >= 1.0 {
-						for event in child_events.drain(..) {
-							new_animations.push_back((0.0, event));
-						}
-					}
 				}
 				// TODO: Make the time offset thing more general, so that
 				// other events don't freak out with ice graphics
-				Event::HomeSatisfied {
-					home_loc: [home_x, home_y],
-					satisfier,
+				Animation::TileModification {
+					entity_id,
 					from: [from_x, from_y],
+					at: [at_x, at_y],
+					new_tile: _new_tile,
 				} => {
-					*timer = 1.0f32.min(*timer + delta_time * 7.0);
-					let t = (*timer *  *timer) * (3.0 - 2.0 * *timer);
-					let lerp_x = lerp(from_x as f32, home_x as f32, t);
-					let lerp_y = lerp(from_y as f32, home_y as f32, t);
+					let t = (time * time) * (3.0 - 2.0 * time);
+					let lerp_x = lerp(from_x as f32, at_x as f32, t);
+					let lerp_y = lerp(from_y as f32, at_y as f32, t);
 
 					// @Cleanup: Don't unwrap here, dummy!
 					let mut entity =
-						self.entities.get_mut(&satisfier).unwrap();
+						self.entities.get_mut(&entity_id).unwrap();
 					entity.position = [lerp_x, lerp_y];
 					entity.size = 1.0 - t;
 				}
-				Event::MoveFailure {
+				Animation::FailedMove {
 					entity_id,
 					from: [from_x, from_y],
 					to: [to_x, to_y],
 				} => {
-					*timer = 1.0f32.min(*timer + delta_time * 14.0);
-					let mut t = (*timer *  *timer) * (3.0 - 2.0 * *timer);
+					let mut t = (time * time) * (3.0 - 2.0 * time);
 					t = (0.5 - (t - 0.5).abs()) * 0.2;
 					let lerp_x = lerp(from_x as f32, to_x as f32, t);
 					let lerp_y = lerp(from_y as f32, to_y as f32, t);
@@ -219,8 +199,6 @@ impl LevelGraphics {
 				}
 			}
 		}
-
-		self.animations.append(&mut new_animations);
 
 		for (&id, entity_graphics) in self.entities.iter() {
 			surface.draw(
@@ -249,26 +227,26 @@ impl LevelGraphics {
 			).unwrap();
 		}
 
-		if level.has_won {
-			self.win_panel_position = 
-				1.0f32.min(self.win_panel_position + delta_time * 4.0);
-		}else {
-			self.win_panel_position = 
-				0.0f32.max(self.win_panel_position - delta_time * 4.0);
-		};
+		// if level.has_won {
+		// 	self.win_panel_position = 
+		// 		1.0f32.min(self.win_panel_position + delta_time * 4.0);
+		// }else {
+		// 	self.win_panel_position = 
+		// 		0.0f32.max(self.win_panel_position - delta_time * 4.0);
+		// };
 
-		if self.win_panel_position > 0.05 {
-			let t = 1.0 - self.win_panel_position;
-			let t = 1.0 - (t * t);
+		// if self.win_panel_position > 0.05 {
+		// 	let t = 1.0 - self.win_panel_position;
+		// 	let t = 1.0 - (t * t);
 
-			let panel_y = lerp(-2.0, 0.0, t);
-			graphics.draw_texture_immediate(
-				surface, 
-				aspect, 
-				[-1.0, panel_y - 0.25, 1.0, panel_y + 0.25], 
-				TextureId::VictoryText,
-			);
-		}
+		// 	let panel_y = lerp(-2.0, 0.0, t);
+		// 	graphics.draw_texture_immediate(
+		// 		surface, 
+		// 		aspect, 
+		// 		[-1.0, panel_y - 0.25, 1.0, panel_y + 0.25], 
+		// 		TextureId::VictoryText,
+		// 	);
+		// }
 	}
 }
 

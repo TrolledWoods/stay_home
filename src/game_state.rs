@@ -45,9 +45,9 @@ pub struct LevelPlayer {
 	level: Level,
 	level_graphics: LevelGraphics,
 	cached_input: Option<Input>,
-	events: VecDeque<Event>,
 	hot_load_timer: f32,
 	previous_load: std::time::SystemTime,
+	update_timer: f32,
 }
 
 impl LevelPlayer {
@@ -67,9 +67,9 @@ impl LevelPlayer {
 			level,
 			level_graphics,
 			cached_input: None,
-			events: VecDeque::new(),
 			hot_load_timer: 0.0,
 			previous_load: std::time::SystemTime::now(),
+			update_timer: 0.0,
 		})
 	}
 
@@ -119,18 +119,28 @@ impl LevelPlayer {
 			}
 		}
 
-		if self.level_graphics.animations.len() == 0 {
+		self.update_timer -= dt * 15.0;
+		if self.update_timer <= 0.0 {
+			self.level_graphics.animations.clear();
+
 			if let Some(input) = self.cached_input.take() {
-				self.level.input(input, &mut self.events);
-				for event in self.events.drain(..) {
-					self.level_graphics.animations.push_back((0.0, event));
-				}
+				self.level.input(input);
+			}
+
+			if !self.level.active_events.empty() {
+				self.update_timer = 1.0;
+				self.level.update(&mut self.level_graphics.animations);
 			}
 		}
 
 		surface.clear_color(0.3, 0.3, 0.5, 1.0);
-		self.level_graphics
-			.render_level(&graphics, surface, aspect, &mut self.level, dt);
+		self.level_graphics.render_level(
+			&graphics, 
+			surface, 
+			aspect, 
+			&mut self.level, 
+			1.0f32.min(1.0 - self.update_timer),
+		);
 
 		Ok(())
 	}

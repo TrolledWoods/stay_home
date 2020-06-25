@@ -10,6 +10,9 @@ pub struct Level {
 	pub height: usize,
 	pub tiles: Vec<Tile>,
 
+	pub active_events: Events,
+	old_events: Option<Events>,
+
 	pub n_tile_changes: u32,
 
 	entity_id_ctr: u32,
@@ -97,195 +100,144 @@ impl Level {
 			player_id,
 			has_won: false,
 			n_tile_changes: 0,
+			active_events: Events::new(),
+			old_events: None,
 		})
 	}
 
-	pub fn input(&mut self, input: Input, events: &mut VecDeque<Event>) {
-		self.move_entity(self.player_id, input, events);
-	}
-
-	fn move_entity(&mut self, id: u32, input: Input, events: &mut VecDeque<Event>) -> bool {
-		// @Cleanup: For now we expect the entity is not dead...
-		let mut entity = self.entities.get(&id).unwrap();
-		let old_x = entity.x;
-		let old_y = entity.y;
-		let mut x = entity.x;
-		let mut y = entity.y;
-		match input {
-			Input::MoveLeft => {
-				x -= 1;
-			},
-			Input::MoveRight => {
-				x += 1;
-			},
-			Input::MoveDown => {
-				y -= 1;
-			},
-			Input::MoveUp => {
-				y += 1;
-			},
-			Input::Confirm => (),
-			Input::Restart => (),
-		}
-
-		if x < 0 || y < 0 || x >= self.width as isize || y >= self.height as isize {
-			events.push_back(Event::MoveFailure {
-				entity_id: id,
-				from: [old_x, old_y],
-				to: [x, y],
-			});
-			return false;
-		}
-
-		if self.tiles[x as usize + y as usize * self.width].is_solid() {
-			events.push_back(Event::MoveFailure {
-				entity_id: id,
-				from: [old_x, old_y],
-				to: [x, y],
-			});
-			return false;
-		}
-
-		let mut moving_into = None;
-		for (&other_id, entity) in self.entities.iter() {
-			if other_id == id { continue; }
-
-			if entity.x == x && entity.y == y {
-				moving_into = Some(other_id);
-				break;
-			}
-		}
-
-		// If you're standing on ice and you're pushing something, you push
-		// that thing, but you don't move with it.
-		if self.tiles[old_x as usize + old_y as usize * self.width] == Tile::Ice {
-			if let Some(moving_into) = moving_into {
-				self.move_entity(moving_into, input, events);
-				return false;
-			}
-		}
-
-		if let Some(moving_into) = moving_into {
-			// If that entity couldn't move, we can't either!
-			if !self.move_entity(moving_into, input, events) {
-				events.push_back(Event::MoveFailure {
-					entity_id: id,
-					from: [old_x, old_y],
-					to: [x, y],
-				});
-				return false;
-			}
-		}
-
-		if self.tiles[x as usize + y as usize * self.width] == Tile::Ice {
-			let mut child_events = VecDeque::new();
-			let entity = self.entities.get_mut(&id).unwrap();
-			entity.x = x;
-			entity.y = y;
-			self.move_entity(id, input, &mut child_events);
-			events.push_back(Event::EntityMoved {
-				entity_id: id,
-				from: [old_x, old_y],
-				to: [x, y],
-				child_events,
-			});
-			return true;
-		}
-
-		let entity = self.entities.get(&id).unwrap();
-		if entity.kind == EntityKind::Cake && 
-			self.tiles[x as usize + y as usize * self.width] == Tile::SadHome
-		{
-			self.tiles[x as usize + y as usize * self.width] = Tile::Home;
-			self.n_tile_changes += 1;
-
-			self.entities.remove(&id);
-			events.push_back(Event::HomeSatisfied {
-				home_loc: [x, y],
-				from: [old_x, old_y],
-				satisfier: id,
-			});
-			return true;
-		}
-
-		if entity.kind == EntityKind::Human && 
-			self.tiles[x as usize + y as usize * self.width] == Tile::Home
-		{
-			self.tiles[x as usize + y as usize * self.width] = Tile::HappyHome;
-			self.n_tile_changes += 1;
-
-			self.n_humans -= 1;
-			if self.n_humans == 0 {
-				self.has_won = true;
-			}
-
-			self.entities.remove(&id);
-			events.push_back(Event::HomeSatisfied {
-				home_loc: [x, y],
-				from: [old_x, old_y],
-				satisfier: id,
-			});
-			return true;
-		}
-
-		println!("Entity {} moved!", id);
-		events.push_back(Event::EntityMoved {
-			entity_id: id,
-			from: [old_x, old_y],
-			to: [x, y],
-			child_events: VecDeque::new(),
+	pub fn input(&mut self, input: Input) {
+		let entity = self.entities.get(&self.player_id).unwrap();
+		self.active_events.moves.push(MoveEntity {
+			entity_id: self.player_id,
+			from: [entity.x, entity.y],
+			direction: input,
 		});
+	}
 
-		let entity = self.entities.get_mut(&id).unwrap();
-		entity.x = x;
-		entity.y = y;
+	pub fn tile_is_solid(&self, pos: [isize; 2]) -> bool {
+		if pos[0] < 0 || pos[0] as usize >= self.width || 
+			pos[1] < 0 || pos[1] as usize >= self.height 
+		{
+			return true;
+		}
 
-		true
+		match self.tiles[pos[0] as usize + pos[1] as usize * self.width] {
+			Tile::Wall | Tile::HappyHome => return true,
+			_ => (),
+		}
+
+		for entity in self.entities.values() {
+			if entity.x == pos[0] && entity.y == pos[1] {
+				return true;
+			}
+		}
+
+		false
+	}
+
+	pub fn update(&mut self, animations: &mut VecDeque<Animation>) {
+		let mut events = std::mem::replace(
+			&mut self.active_events, 
+			self.old_events.take().unwrap_or_else(|| Events::new()),
+		);
+
+		// TODO: Pushing logic
+
+		// TODO: Resolve move conflicts
+
+		// Run all the moves
+		// It's run in reverse because the moves resulting from pushing
+		// are always further back in the list, so if we reverse it those
+		// are moved first, which allows the pushers to also be moved.
+		for move_ in events.moves.drain(..).rev() {
+			let to = move_.to();
+
+			if self.tile_is_solid(to) {
+				animations.push_back(Animation::FailedMove {
+					entity_id: move_.entity_id,
+					from: move_.from,
+					to,
+				});
+				continue;
+			}
+
+			let entity = self.entities.get_mut(&move_.entity_id).unwrap();
+			entity.x = to[0];
+			entity.y = to[1];
+
+			animations.push_back(Animation::Move {
+				entity_id: move_.entity_id,
+				from: move_.from,
+				to,
+			});
+		}
+
+		self.old_events = Some(events);
 	}
 }
 
-#[derive(Clone, PartialEq)]
-pub enum Event {
-	EntityMoved {
-		entity_id: u32,
-		from: [isize; 2],
-		to: [isize; 2],
-		child_events: VecDeque<Event>,
-	},
-	// TODO: Make this just "EntityUsedOnTile" or something
-	HomeSatisfied {
-		home_loc: [isize; 2],
-		satisfier: u32,
-		from: [isize; 2],
-	},
-	MoveFailure {
-		entity_id: u32,
-		from: [isize; 2],
-		to: [isize; 2],
+#[derive(Clone, Copy)]
+pub enum Animation {
+	Move { entity_id: u32, from: [isize; 2], to: [isize; 2] },
+	FailedMove { entity_id: u32, from: [isize; 2], to: [isize; 2] },
+	TileModification { entity_id: u32, from: [isize; 2], at: [isize; 2], new_tile: Tile },
+}
+
+#[derive(Clone)]
+pub struct Events {
+	pub moves: Vec<MoveEntity>,
+	pub tile_modifications: Vec<TileModification>,
+}
+
+impl Events {
+	fn new() -> Events {
+		Events {
+			moves: Vec::new(),
+			tile_modifications: Vec::new(),
+		}
+	}
+
+	pub fn empty(&self) -> bool {
+		self.moves.len() == 0 && self.tile_modifications.len() == 0
 	}
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy)]
+pub struct MoveEntity {
+	entity_id: u32,
+	from: [isize; 2],
+	direction: Input,
+}
+
+impl MoveEntity {
+	pub fn to(&self) -> [isize; 2] {
+		match self.direction {
+			Input::MoveRight => [self.from[0] + 1, self.from[1]    ],
+			Input::MoveUp    => [self.from[0]    , self.from[1] + 1],
+			Input::MoveLeft  => [self.from[0] - 1, self.from[1]    ],
+			Input::MoveDown  => [self.from[0]    , self.from[1] - 1],
+			_ => todo!("Make a direction enum instead of an input enum"),
+		}
+	}
+}
+
+#[derive(Clone, Copy)]
+pub struct TileModification {
+	sacrifice: u32,
+	at: [isize; 2],
+}
+
+#[derive(Clone, Copy)]
 pub enum Tile {
-	Home,
-	HappyHome,
-	SadHome,
 	Floor,
 	Wall,
+	SadHome,
+	Home,
+	HappyHome,
 	Ice,
 }
 
-impl Tile {
-	pub fn is_solid(&self) -> bool {
-		use Tile::*;
-		match self {
-			Wall | HappyHome => true,
-			_ => false,
-		}
-	}
-}
-
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct Entity {
 	pub x: isize,
 	pub y: isize,

@@ -8,7 +8,7 @@ mod matrix;
 mod prelude {
 	pub use glium::*;
 	pub use glutin::event::{KeyboardInput, ElementState};
-	pub use crate::level::{Level, Event};
+	pub use crate::level::Level;
 	pub use crate::level_graphics::LevelGraphics;
 	pub use crate::graphics::Graphics;
 	pub use crate::{Input, lerp};
