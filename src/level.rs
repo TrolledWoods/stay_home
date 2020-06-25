@@ -106,6 +106,16 @@ impl Level {
 	}
 
 	pub fn input(&mut self, input: Input) {
+		// @Cleanup: Direction enum!
+		if input == Input::Confirm { return; }
+
+		for move_ in self.active_events.moves.iter() {
+			if move_.entity_id == self.player_id {
+				println!("Cannot create a duplicate move!");
+				return;
+			}
+		}
+
 		let entity = self.entities.get(&self.player_id).unwrap();
 		self.active_events.moves.push(MoveEntity {
 			entity_id: self.player_id,
@@ -135,13 +145,73 @@ impl Level {
 		false
 	}
 
+	fn get_entity_at_tile(&self, pos: [isize; 2]) -> Option<u32> {
+		for (&id, entity) in self.entities.iter() {
+			if entity.x == pos[0] && entity.y == pos[1] {
+				return Some(id);
+			}
+		}
+		None
+	}
+
 	pub fn update(&mut self, animations: &mut VecDeque<Animation>) {
 		let mut events = std::mem::replace(
 			&mut self.active_events, 
 			self.old_events.take().unwrap_or_else(|| Events::new()),
 		);
+		let mut new_events = Events::new();
 
-		// TODO: Pushing logic
+		for tile_modification in events.tile_modifications.drain(..) {
+			let at = tile_modification.at;
+			self.tiles[at[0] as usize + at[1] as usize * self.width] =
+				tile_modification.into;
+			self.n_tile_changes += 1;
+
+			animations.push_back(Animation::TileModification {
+				entity_id: tile_modification.sacrifice,
+				at,
+				new_tile: tile_modification.into,
+			});
+
+			if let Some(entity) = self.entities.remove(&tile_modification.sacrifice) {
+				if entity.kind == EntityKind::Human {
+					self.n_humans -= 1;
+					if self.n_humans == 0 {
+						self.has_won = true;
+					}
+				}
+			}
+		}
+
+		let mut index = 0;
+		while index < events.moves.len() {
+			let move_ = events.moves[index];
+			let to = move_.to();
+
+			if let Some(id) = self.get_entity_at_tile(move_.to()) {
+				match self.tiles[to[0] as usize + to[1] as usize * self.width] {
+					Tile::Ice => {
+						let entity = self.entities.get(&id).unwrap();
+						events.moves[index] = MoveEntity {
+							entity_id: id,
+							from: [entity.x, entity.y],
+							direction: move_.direction,
+						};
+						continue;
+					},
+					_ => (),
+				}
+				
+				let entity = self.entities.get(&id).unwrap();
+				events.moves.push(MoveEntity {
+					entity_id: id,
+					from: [entity.x, entity.y],
+					direction: move_.direction,
+				});
+			}
+
+			index += 1;
+		}
 
 		// TODO: Resolve move conflicts
 
@@ -162,6 +232,31 @@ impl Level {
 			}
 
 			let entity = self.entities.get_mut(&move_.entity_id).unwrap();
+			match self.tiles[to[0] as usize + to[1] as usize * self.width] {
+				Tile::Ice => {
+					new_events.moves.push(MoveEntity {
+						entity_id: move_.entity_id,
+						from: to,
+						direction: move_.direction,
+					});
+				},
+				Tile::SadHome if entity.kind == EntityKind::Cake => {
+					new_events.tile_modifications.push(TileModification {
+						into: Tile::Home,
+						sacrifice: move_.entity_id,
+						at: to,
+					});
+				}
+				Tile::Home if entity.kind == EntityKind::Human => {
+					new_events.tile_modifications.push(TileModification {
+						into: Tile::HappyHome,
+						sacrifice: move_.entity_id,
+						at: to,
+					});
+				}
+				_ => (),
+			}
+
 			entity.x = to[0];
 			entity.y = to[1];
 
@@ -172,6 +267,7 @@ impl Level {
 			});
 		}
 
+		self.active_events = new_events;
 		self.old_events = Some(events);
 	}
 }
@@ -180,7 +276,7 @@ impl Level {
 pub enum Animation {
 	Move { entity_id: u32, from: [isize; 2], to: [isize; 2] },
 	FailedMove { entity_id: u32, from: [isize; 2], to: [isize; 2] },
-	TileModification { entity_id: u32, from: [isize; 2], at: [isize; 2], new_tile: Tile },
+	TileModification { entity_id: u32, at: [isize; 2], new_tile: Tile },
 }
 
 #[derive(Clone)]
@@ -223,6 +319,7 @@ impl MoveEntity {
 
 #[derive(Clone, Copy)]
 pub struct TileModification {
+	into: Tile,
 	sacrifice: u32,
 	at: [isize; 2],
 }

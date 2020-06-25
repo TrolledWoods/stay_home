@@ -53,6 +53,7 @@ fn main() {
 	keybindings.insert(77, Input::MoveRight);
 	keybindings.insert(28, Input::Confirm);
 	keybindings.insert(57, Input::Confirm);
+	keybindings.insert(56, Input::Confirm);
 	keybindings.insert(19, Input::Restart); // 'R'
 
 	let mut graphics = graphics::Graphics::new(&display);

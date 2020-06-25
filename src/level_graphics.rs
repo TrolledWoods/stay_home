@@ -165,22 +165,16 @@ impl LevelGraphics {
 					self.entities.get_mut(&entity_id).unwrap().position 
 						= [lerp_x, lerp_y];
 				}
-				// TODO: Make the time offset thing more general, so that
-				// other events don't freak out with ice graphics
 				Animation::TileModification {
 					entity_id,
-					from: [from_x, from_y],
 					at: [at_x, at_y],
 					new_tile: _new_tile,
 				} => {
 					let t = (time * time) * (3.0 - 2.0 * time);
-					let lerp_x = lerp(from_x as f32, at_x as f32, t);
-					let lerp_y = lerp(from_y as f32, at_y as f32, t);
 
 					// @Cleanup: Don't unwrap here, dummy!
 					let mut entity =
 						self.entities.get_mut(&entity_id).unwrap();
-					entity.position = [lerp_x, lerp_y];
 					entity.size = 1.0 - t;
 				}
 				Animation::FailedMove {

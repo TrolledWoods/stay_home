@@ -119,7 +119,7 @@ impl LevelPlayer {
 			}
 		}
 
-		self.update_timer -= dt * 15.0;
+		self.update_timer -= dt * 7.0;
 		if self.update_timer <= 0.0 {
 			self.level_graphics.animations.clear();
 
