@@ -123,13 +123,7 @@ impl LevelPlayer {
 			if let Some(input) = self.cached_input.take() {
 				self.level.input(input, &mut self.events);
 				for event in self.events.drain(..) {
-					let time = 
-						if let Event::EntityMoved { time_offset, .. } = event {
-							-time_offset
-						} else {
-							0.0
-						};
-					self.level_graphics.animations.push_back((time, event));
+					self.level_graphics.animations.push_back((0.0, event));
 				}
 			}
 		}

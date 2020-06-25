@@ -157,25 +157,31 @@ impl LevelGraphics {
 
 		// Animate stuff
 		let n_animations = self.animations.len();
-		for &mut (ref mut timer, event) in self.animations.iter_mut() {
-			match event {
+		// TODO: This bad!!!! Don't allocate more stuff
+		let mut new_animations = VecDeque::new();
+		for (timer, event) in self.animations.iter_mut() {
+			match *event {
 				Event::EntityMoved {
-					time_offset,
 					entity_id,
 					from: [from_x, from_y],
 					to: [to_x, to_y],
+					ref mut child_events,
 				} => {
 					*timer = 1.0f32.min(*timer + delta_time * 9.0);
+
 					let mut t = *timer;
+					t = (t *  t) * (3.0 - 2.0 * t);
+					let lerp_x = lerp(from_x as f32, to_x as f32, t);
+					let lerp_y = lerp(from_y as f32, to_y as f32, t);
 
-					if t > 0.0 {
-						t = (t *  t) * (3.0 - 2.0 * t);
-						let lerp_x = lerp(from_x as f32, to_x as f32, t);
-						let lerp_y = lerp(from_y as f32, to_y as f32, t);
+					// @Cleanup: Don't unwrap here, dummy!
+					self.entities.get_mut(&entity_id).unwrap().position 
+						= [lerp_x, lerp_y];
 
-						// @Cleanup: Don't unwrap here, dummy!
-						self.entities.get_mut(&entity_id).unwrap().position 
-							= [lerp_x, lerp_y];
+					if *timer >= 1.0 {
+						for event in child_events.drain(..) {
+							new_animations.push_back((0.0, event));
+						}
 					}
 				}
 				// TODO: Make the time offset thing more general, so that
@@ -213,6 +219,8 @@ impl LevelGraphics {
 				}
 			}
 		}
+
+		self.animations.append(&mut new_animations);
 
 		for (&id, entity_graphics) in self.entities.iter() {
 			surface.draw(

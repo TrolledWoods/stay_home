@@ -101,10 +101,10 @@ impl Level {
 	}
 
 	pub fn input(&mut self, input: Input, events: &mut VecDeque<Event>) {
-		self.move_entity(0.0, self.player_id, input, events);
+		self.move_entity(self.player_id, input, events);
 	}
 
-	fn move_entity(&mut self, time_offset: f32, id: u32, input: Input, events: &mut VecDeque<Event>) -> bool {
+	fn move_entity(&mut self, id: u32, input: Input, events: &mut VecDeque<Event>) -> bool {
 		// @Cleanup: For now we expect the entity is not dead...
 		let mut entity = self.entities.get(&id).unwrap();
 		let old_x = entity.x;
@@ -156,10 +156,18 @@ impl Level {
 			}
 		}
 
+		// If you're standing on ice and you're pushing something, you push
+		// that thing, but you don't move with it.
+		if self.tiles[old_x as usize + old_y as usize * self.width] == Tile::Ice {
+			if let Some(moving_into) = moving_into {
+				self.move_entity(moving_into, input, events);
+				return false;
+			}
+		}
 
 		if let Some(moving_into) = moving_into {
 			// If that entity couldn't move, we can't either!
-			if !self.move_entity(time_offset, moving_into, input, events) {
+			if !self.move_entity(moving_into, input, events) {
 				events.push_back(Event::MoveFailure {
 					entity_id: id,
 					from: [old_x, old_y],
@@ -170,16 +178,17 @@ impl Level {
 		}
 
 		if self.tiles[x as usize + y as usize * self.width] == Tile::Ice {
-			events.push_back(Event::EntityMoved {
-				time_offset,
-				entity_id: id,
-				from: [old_x, old_y],
-				to: [x, y],
-			});
+			let mut child_events = VecDeque::new();
 			let entity = self.entities.get_mut(&id).unwrap();
 			entity.x = x;
 			entity.y = y;
-			self.move_entity(time_offset + 1.0, id, input, events);
+			self.move_entity(id, input, &mut child_events);
+			events.push_back(Event::EntityMoved {
+				entity_id: id,
+				from: [old_x, old_y],
+				to: [x, y],
+				child_events,
+			});
 			return true;
 		}
 
@@ -221,10 +230,10 @@ impl Level {
 
 		println!("Entity {} moved!", id);
 		events.push_back(Event::EntityMoved {
-			time_offset,
 			entity_id: id,
 			from: [old_x, old_y],
 			to: [x, y],
+			child_events: VecDeque::new(),
 		});
 
 		let entity = self.entities.get_mut(&id).unwrap();
@@ -235,13 +244,13 @@ impl Level {
 	}
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Event {
 	EntityMoved {
-		time_offset: f32,
 		entity_id: u32,
 		from: [isize; 2],
 		to: [isize; 2],
+		child_events: VecDeque<Event>,
 	},
 	// TODO: Make this just "EntityUsedOnTile" or something
 	HomeSatisfied {
