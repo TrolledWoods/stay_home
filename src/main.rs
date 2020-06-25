@@ -60,6 +60,7 @@ fn main() {
 	let mut state = game_state::GameState::PlayingLevel(
 		game_state::LevelPlayer::new(
 			vec![
+				"levels/experiment.txt".parse().unwrap(),
 				"levels/start.txt".parse().unwrap(),
 				"levels/walk_through_empty_homes.txt".parse().unwrap(),
 				"levels/filled_houses.txt".parse().unwrap(),
