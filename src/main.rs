@@ -1,3 +1,4 @@
+mod game_state;
 mod level;
 mod graphics;
 mod textures;
@@ -8,8 +9,9 @@ mod prelude {
 	pub use glium::*;
 	pub use glutin::event::{KeyboardInput, ElementState};
 	pub use crate::level::{Level, Event};
-	pub use crate::Input;
-	pub use crate::lerp;
+	pub use crate::level_graphics::LevelGraphics;
+	pub use crate::graphics::Graphics;
+	pub use crate::{Input, lerp};
 }
 
 use prelude::*;
@@ -53,31 +55,40 @@ fn main() {
 	keybindings.insert(57, Input::Confirm);
 	keybindings.insert(19, Input::Restart); // 'R'
 
-	let mut last_time_level_read = std::fs::metadata("level.txt").unwrap().modified().unwrap();
-
 	let mut graphics = graphics::Graphics::new(&display);
-	let mut level = level::Level::from_string(&std::fs::read_to_string("level.txt").unwrap()).unwrap();
-	let mut level_graphics = 
-		level_graphics::LevelGraphics::new(&graphics, &level);
 
-	let mut cached_input = None;
+	let mut state = game_state::GameState::PlayingLevel(
+		game_state::LevelPlayer::new(
+			vec![
+				"levels/start.txt".parse().unwrap(),
+				"levels/walk_through_empty_homes.txt".parse().unwrap(),
+				"levels/filled_houses.txt".parse().unwrap(),
+				"levels/indirect_access.txt".parse().unwrap(),
+				"levels/priorities.txt".parse().unwrap(),
+				"levels/cake_trouble.txt".parse().unwrap(),
+				"levels/crazy_cake_level.txt".parse().unwrap(),
+			], 
+			&mut graphics,
+		).unwrap()
+	);
 
 	let mut previous_frame = Instant::now();
-
-	// @Cleanup: Make the level update checking
-	// much, much cleaner, this is horrendous!
-	let mut level_file_check_time = 0.0;
-	let mut events = VecDeque::new();
 	events_loop.run(move |event, _, control_flow| {
 		let current_frame = Instant::now();
 		let mut dt = (current_frame - previous_frame).as_micros() as f32 
 			/ 1_000_000.0;
 		previous_frame = current_frame;
 
-		*control_flow = glutin::event_loop::ControlFlow::WaitUntil(current_frame + std::time::Duration::from_millis(1));
+		*control_flow = glutin::event_loop::ControlFlow::WaitUntil(current_frame + std::time::Duration::from_millis(5));
 
 		use glutin::event::{Event, WindowEvent};
 		match event {
+			Event::WindowEvent {
+				event: WindowEvent::CloseRequested,
+				..
+			} => {
+				*control_flow = glutin::event_loop::ControlFlow::Exit;
+			}
 			Event::WindowEvent {
 				event: WindowEvent::Resized(size),
 				..
@@ -86,23 +97,14 @@ fn main() {
 			}
 			Event::WindowEvent {
 				event: WindowEvent::KeyboardInput {
-					input: KeyboardInput { state, scancode, .. },
+					input: KeyboardInput { state: key_state, scancode, .. },
 					..
 				},
 				..
 			} => {
 				if let Some(&keybind) = keybindings.get(&scancode) {
-					if state == ElementState::Pressed {
-						if keybind == Input::Restart {
-							match level::Level::from_string(&std::fs::read_to_string("level.txt").unwrap()) {
-								Ok(l) => level = l,
-								Err(err) => println!("Error in level: {:?}", err),
-							}
-							level_graphics
-								.reset(&mut graphics, &level);
-						}
-
-						cached_input = Some(keybind);
+					if key_state == ElementState::Pressed {
+						state.input(&mut graphics, keybind).unwrap();
 					}
 				}else {
 					println!("Unknown key scancode: '{}'", scancode);
@@ -111,33 +113,8 @@ fn main() {
 			_ => (),
 		}
 
-		level_file_check_time -= dt;
-		if level_file_check_time < 0.0 {
-			level_file_check_time = 0.5;
-			let new_time = std::fs::metadata("level.txt").unwrap().modified().unwrap();
-			if last_time_level_read != new_time {
-				match level::Level::from_string(&std::fs::read_to_string("level.txt").unwrap()) {
-					Ok(l) => level = l,
-					Err(err) => println!("Error in level: {:?}", err),
-				}
-				level_graphics
-					.reset(&mut graphics, &level);
-				last_time_level_read = new_time;
-			}
-		}
-
-		if level_graphics.animations.len() == 0 {
-			if let Some(input) = cached_input.take() {
-				level.input(input, &mut events);
-				for event in events.drain(..) {
-					level_graphics.animations.push_back((0.0, event));
-				}
-			}
-		}
-
 		let mut frame = display.draw();
-		frame.clear_color(0.3, 0.3, 0.5, 1.0);
-		level_graphics.render_level(&graphics, &mut frame, aspect, &mut level, dt);
+		state.render(&mut frame, &mut graphics, aspect, dt);
 		frame.finish().unwrap();
 	});
 }
