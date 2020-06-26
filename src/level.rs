@@ -112,6 +112,8 @@ impl Level {
 			levels.insert(0, level);
 		}
 
+		println!("Loaded {} levels", levels.len());
+
 		Ok(levels)
 	}
 
@@ -223,13 +225,17 @@ impl Level {
 				// If the things in question is already moving out of the way,
 				// increase the priority of that, and then move on!
 				//
-				// This feels a little bit hacky though, but it seems to work
-				// fairly well with ice for now? I think this will break easily
-				// if several different things are moving at once and interacting,
-				// but that probably won't be a problem for now, at least not
-				// with the current game mechanics.
+				// @Cleanup: This method of doing things is silly. The
+				// ``i == events.moves.len() - 1`` is just a hack to not make
+				// it get stuck in an infinite loop.
 				for (i, other_move) in events.moves.iter().enumerate() {
 					if other_move.from == to {
+						if i == events.moves.len() - 1 {
+							// With the last move this is a noop?
+							println!("The last move is having trouble");
+							break;
+						}
+
 						let other_move = events.moves.remove(i);
 						events.moves.push(other_move);
 						continue 'outer;
@@ -256,11 +262,11 @@ impl Level {
 							move_.direction,
 						));
 					}
-					(_, _) if !move_.is_friction_push => {
-						// Cannot push things that are not on ice
-						// while on ice.
-						index += 1;
-					}
+					// (_, _) if !move_.is_friction_push => {
+					// 	// Cannot push things that are not on ice
+					// 	// while on ice.
+					// 	index += 1;
+					// }
 					(_, _) => {
 						// Just normal pushing
 						events.moves.push(MoveEntity {

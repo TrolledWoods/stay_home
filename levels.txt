@@ -1,3 +1,8 @@
+..%%%%...
+..%%%%p..
+..%%C%c..
+..%%%%...
+
 // Basic tutorial
 .......
 .p.b.H.
@@ -74,13 +79,32 @@ p.cb.
 %%%%%%%%%
 
 // Ice fun!
-....%%%%%#.%
-.....%%%#%..
-.p.%%%%%%%b.
-....%%%%%#%.
-..H..%%%%#%%
+...%#%..
+p.%%%%b.
+H..%%#%%
 
-// More complicated ice stuff
+// Silly ice skating level for fun(also teaches a little about kicking)
+%%%%%%%%%%%%
+%%.%.%%%%%%%
+%%%.%%.%%%%%
+%.%%%.%%%%%%
+%%%%%%%.%.%%
+%%.%%%%%B%%H
+%%%.%%%%%%P%
+%.%%%%.%%%%%
+%%%%%.%.%%%%
+%%%%.%%%%.%%
+%%%%%%%%%%%%
+
+// Even more kicking!
+.#%..
+.p%..
+..C..
+.b%##
+##%##
+##S##
+
+// Kicking that requires preparation...
 ...%.
 .b.%.
 .p#%.
