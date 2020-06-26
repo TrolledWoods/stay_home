@@ -1,94 +1,110 @@
-// Ice kicking
-.............
-.............
-.............
-....@.$..$...
-...$%%%%%....
-...$%%%%%....
-...$%%%%%$...
-....%%%%%$...
-.............
-.............
-.............
+// Ice skating
+%%%%%%%%%
+%%%%%%%%%
+%P%%B%%H%
+%%%%%%%%%
+%%%%%%%%%
+
+// Ice fun!
+....%%%%%#.%
+.....%%%#%..
+.p.%%%%%%%b.
+....%%%%%#%.
+..H..%%%%#%%
+
+// Blocking stuff with ice
+p.##..
+..%%c.
+.b#...
+..#.H.
+......
+
+// Pushing things onto ice only works
+// if you're standing on ground.
+.....#...
+...c.#...
+.p...%.H.
+...b.#...
+.....#...
 
 // Basic tutorial
 .......
-.@.$.H.
+.p.b.H.
 .......
 
 // Walking through empty home
 ...#...
-.@.H.$.
+.p.H.b.
 ...#...
 
 // One thing before the other
 ...#.H.
-.@.#...
-.$.H.$.
+.p.#...
+.b.H.b.
 ...#...
 
 // Feed tape #1
 ###H.
-H$$$.
-...@.
+Hbbb.
+...p.
 ....H
 
 // Wall stuff
-.@..
-$..H
+.p..
+b..H
 ....
-..$.
+..b.
 H.##
 
 // Roundabout
 ###.H
 ..#..
-.$#..
-.$##.
-.@...
+.b#..
+.b##.
+.p...
 .#...
 ##..H
 
 // Simple cake
 .........
-.@.C.S.$.
+.p.c.S.b.
 .........
 
 // Even more cake stuff
 ###.S.
-..$.$.
-.C@#..
+..b.b.
+.cp#..
 ....#.
 .....H
 
 // Trouble!
 ....#
-.@CSH
-.$$##
+.pcSH
+.bb##
 ...##
 
-// Complicate cake logic!
-.$..S
-.C.#.
-@.C$.
+// complicate cake logic!
+.b..S
+.c.#.
+p.cb.
 ....S
 
-// Cake feed tape!
+// cake feed tape!
 ###H.
-..$$.
-.C...
-#..@S
+..bb.
+.c...
+#..pS
 
 // Simple ice
 ..%%..
-.@%%$.
+.p%%b.
 .H%%..
 
 // More complicated ice stuff
 ...%.
-.$.%.
-.@#%.
-..C%C
+.b.%.
+.p#%.
+..c%c
 ...%.
 ###%#
 ###S#

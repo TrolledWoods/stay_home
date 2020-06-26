@@ -76,22 +76,42 @@ impl LevelPlayer {
 	pub fn input(&mut self, graphics: &mut Graphics, input: Input) 
 		-> Result<(), String> 
 	{
-		if input == Input::Restart {
-			self.reload_level(graphics)?;
-		}else if input == Input::Confirm && self.level.has_won {
-			self.current_level += 1;
-
-			if self.levels.len() > 0 {
-				match self.reload_level(graphics) {
-					Ok(_) => (),
-					Err(err) => println!("Error going to next level: {}", err),
-				}
+		// @Cleanup: Use a friggin match
+		let mut level_changed = false;
+		if input == Input::PrevLevel {
+			if self.current_level > 0 {
+				self.current_level -= 1;
+			}else {
+				println!("No previous level");
+			}
+			level_changed = true;
+		}
+		if input == Input::NextLevel || 
+			(input == Input::Confirm && self.level.has_won)
+		{
+			if self.current_level < self.levels.len() - 1 {
+				self.current_level += 1;
 			}else {
 				println!("No more levels!");
 			}
-		}else {
-			self.cached_input = Some(input);
+			level_changed = true;
 		}
+		if input == Input::Restart || 
+			(input == Input::Confirm && !self.level.has_won) 
+		{
+			level_changed = true;
+		}
+
+		if level_changed {
+			match self.reload_level(graphics) {
+				Ok(_) => (),
+				Err(err) => println!("Error going to next level: {}", err),
+			}
+
+			return Ok(());
+		}
+
+		self.cached_input = Some(input);
 		Ok(())
 	}
 

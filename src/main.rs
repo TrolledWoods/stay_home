@@ -30,6 +30,8 @@ pub enum Input {
 	MoveDown,
 	Confirm,
 	Restart,
+	NextLevel,
+	PrevLevel,
 }
 
 fn main() {
@@ -54,6 +56,8 @@ fn main() {
 	keybindings.insert(28, Input::Confirm);
 	keybindings.insert(57, Input::Confirm);
 	keybindings.insert(56, Input::Confirm);
+	keybindings.insert(62, Input::PrevLevel);
+	keybindings.insert(63, Input::NextLevel);
 	keybindings.insert(19, Input::Restart); // 'R'
 
 	let mut graphics = graphics::Graphics::new(&display);

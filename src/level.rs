@@ -69,7 +69,7 @@ impl Level {
 			for (x, char_) in line.chars().enumerate() {
 				level.tiles.push(match char_ {
 					// Entities
-					'@' => {
+					'p' | 'P' => {
 						if has_player {
 							return 
 								Err(format!("Cannot have more than 1 player!"));
@@ -81,26 +81,20 @@ impl Level {
 							Entity::new(x as isize, y as isize, EntityKind::Player));
 						level.player_id = level.entity_id_ctr;
 						level.entity_id_ctr += 1;
-						Tile::Floor
+						if char_.is_uppercase() { Tile::Ice } else { Tile::Floor }
 					}
-					'$' => {
+					'b' | 'B' => {
 						level.entities.insert(level.entity_id_ctr, 
 							Entity::new(x as isize, y as isize, EntityKind::Human));
 						level.entity_id_ctr += 1;
 						level.n_humans += 1;
-						Tile::Floor
+						if char_.is_uppercase() { Tile::Ice } else { Tile::Floor }
 					}
-					'B' => {
-						level.entities.insert(level.entity_id_ctr, 
-							Entity::new(x as isize, y as isize, EntityKind::Block));
-						level.entity_id_ctr += 1;
-						Tile::Floor
-					}
-					'C' => {
+					'c' | 'C' => {
 						level.entities.insert(level.entity_id_ctr, 
 							Entity::new(x as isize, y as isize, EntityKind::Cake));
 						level.entity_id_ctr += 1;
-						Tile::Floor
+						if char_.is_uppercase() { Tile::Ice } else { Tile::Floor }
 					}
 					'.' => Tile::Floor,
 					'#' => Tile::Wall,
