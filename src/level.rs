@@ -121,87 +121,6 @@ impl Level {
 		Ok(levels)
 	}
 
-	pub fn from_string(input: &str) -> Result<Level, String> {
-		let mut n_humans = 0;
-		let mut tiles = Vec::new();
-		let mut entities = HashMap::new();
-		let mut entity_id_ctr = 0;
-		let mut width = 0;
-		let mut height = 0;
-
-		let mut player_id = None;
-
-		let lines = input.lines().map(|v| v.trim()).take_while(|v| !v.is_empty()).collect::<Vec<_>>();
-		for (y, line) in lines.into_iter().rev().enumerate()
-		{
-			if width == 0 { 
-				width = line.len(); 
-			}else if width != line.len() { 
-				return Err(format!("Expected the same width for every line")); 
-			}
-
-			height += 1;
-
-			for (x, char_) in line.chars().enumerate() {
-				tiles.push(match char_ {
-					// Entities
-					'@' => {
-						if player_id.is_some() {
-							return 
-								Err(format!("Cannot have more than 1 player!"));
-						}
-
-						entities.insert(entity_id_ctr, 
-							Entity::new(x as isize, y as isize, EntityKind::Player));
-						player_id = Some(entity_id_ctr);
-						entity_id_ctr += 1;
-						Tile::Floor
-					}
-					'$' => {
-						entities.insert(entity_id_ctr, 
-							Entity::new(x as isize, y as isize, EntityKind::Human));
-						entity_id_ctr += 1;
-						n_humans += 1;
-						Tile::Floor
-					}
-					'B' => {
-						entities.insert(entity_id_ctr, 
-							Entity::new(x as isize, y as isize, EntityKind::Block));
-						entity_id_ctr += 1;
-						Tile::Floor
-					}
-					'C' => {
-						entities.insert(entity_id_ctr, 
-							Entity::new(x as isize, y as isize, EntityKind::Cake));
-						entity_id_ctr += 1;
-						Tile::Floor
-					}
-					'.' => Tile::Floor,
-					'#' => Tile::Wall,
-					'H' => Tile::Home,
-					'S' => Tile::SadHome,
-					'%' => Tile::Ice,
-					c => return Err(format!("Unknown character {}", c)),
-				});
-			}
-		}
-
-		let player_id = player_id.ok_or_else(|| format!("Expected a player"))?;
-		Ok(Level {
-			n_humans,
-			width,
-			height,
-			tiles,
-			entity_id_ctr,
-			entities,
-			player_id,
-			has_won: false,
-			n_tile_changes: 0,
-			active_events: Events::new(),
-			old_events: None,
-		})
-	}
-
 	pub fn input(&mut self, input: Input) {
 		// @Cleanup: Direction enum!
 		if input == Input::Confirm { return; }
@@ -215,16 +134,13 @@ impl Level {
 
 		let entity = self.entities.get(&self.player_id).unwrap();
 
-		let mut is_kicked = false;
-		match self.tiles[entity.x as usize + entity.y as usize * self.width] {
-			Tile::Ice => is_kicked = true,
-			_ => ()
-		}
+		let is_friction_push = match self.get_tile(entity.x, entity.y).unwrap() {
+			Tile::Ice => false,
+			_ => true
+		};
 
 		self.active_events.moves.push(MoveEntity {
-			is_kicked,
-			can_ice_kick: true,
-			slides_without_kick: true,
+			is_friction_push,
 			..MoveEntity::new(self.player_id, [entity.x, entity.y], input)
 		});
 	}
@@ -259,6 +175,16 @@ impl Level {
 		None
 	}
 
+	pub fn get_tile(&self, x: isize, y: isize) -> Option<Tile> {
+		if x < 0 || x as usize >= self.width 
+			|| y < 0 || y as usize >= self.height {
+			return None;
+		}
+
+		// @Cleanup: get_unchecked?? Don't feel like doing unsafe for now.
+		Some(self.tiles[x as usize + y as usize * self.width])
+	}
+
 	pub fn update(&mut self, animations: &mut VecDeque<Animation>) {
 		let mut events = std::mem::replace(
 			&mut self.active_events, 
@@ -266,6 +192,7 @@ impl Level {
 		);
 		let mut new_events = Events::new();
 
+		// Tile modification
 		for tile_modification in events.tile_modifications.drain(..) {
 			let at = tile_modification.at;
 			self.tiles[at[0] as usize + at[1] as usize * self.width] =
@@ -290,40 +217,69 @@ impl Level {
 			}
 		}
 
+		// Pushing things
 		let mut index = 0;
-		while index < events.moves.len() {
+		'outer: while index < events.moves.len() {
 			let move_ = events.moves[index];
 			let to = move_.to();
+			if let Some(id) = self.get_entity_at_tile(to) {
+				let one_self = self.entities.get(&move_.entity_id).unwrap();
+				let entity = self.entities.get(&id).unwrap();
 
-			if let Some(id) = self.get_entity_at_tile(move_.to()) {
-				match self.tiles[to[0] as usize + to[1] as usize * self.width] {
-					Tile::Ice if move_.can_ice_kick => {
+				// If the things in question is already moving out of the way,
+				// increase the priority of that, and then move on!
+				//
+				// This feels a little bit hacky though, but it seems to work
+				// fairly well with ice for now? I think this will break easily
+				// if several different things are moving at once and interacting,
+				// but that probably won't be a problem for now, at least not
+				// with the current game mechanics.
+				for (i, other_move) in events.moves.iter().enumerate() {
+					if other_move.from == to {
+						let other_move = events.moves.remove(i);
+						events.moves.push(other_move);
+						continue 'outer;
+					}
+				}
+				
+				match (
+					self.get_tile(one_self.x, one_self.y).unwrap(),
+					self.get_tile(entity.x,   entity.y  ).unwrap(),
+				) {
+					(_, Tile::Ice) if !move_.is_friction_push => {
+						// If something isn't based on friction, and the target
+						// is on ice, then transfer the energy, don't push!
+						events.moves.remove(index);
+
 						animations.push_back(Animation::IceKick {
 							entity_id: move_.entity_id,
-							from: move_.from,
-							to,
+							from: [one_self.x, one_self.y],
+							to:   [entity.x,   entity.y  ],
 						});
-
-						let entity = self.entities.get(&id).unwrap();
-						events.moves.remove(index);
-						new_events.moves.push(MoveEntity {
-							can_ice_kick: true,
-							is_kicked: true,
+						new_events.moves.push(MoveEntity::new(
+							id,
+							[entity.x, entity.y],
+							move_.direction,
+						));
+					}
+					(_, _) if !move_.is_friction_push => {
+						// Cannot push things that are not on ice
+						// while on ice.
+						index += 1;
+					}
+					(_, _) => {
+						// Just normal pushing
+						events.moves.push(MoveEntity {
+							is_friction_push: true,
 							..MoveEntity::new(id, [entity.x, entity.y], move_.direction)
 						});
-						continue;
-					},
-					_ => (),
+						index += 1;
+					}
 				}
-
-				let entity = self.entities.get(&id).unwrap();
-				events.moves.push(MoveEntity {
-					can_ice_kick: true,
-					..MoveEntity::new(id, [entity.x, entity.y], move_.direction)
-				});
+			} else {
+				// No pushing!
+				index += 1;
 			}
-
-			index += 1;
 		}
 
 		// TODO: Resolve move conflicts
@@ -346,11 +302,8 @@ impl Level {
 
 			let entity = self.entities.get_mut(&move_.entity_id).unwrap();
 			match self.tiles[to[0] as usize + to[1] as usize * self.width] {
-				Tile::Ice if move_.is_kicked || move_.slides_without_kick => {
+				Tile::Ice => {
 					new_events.moves.push(MoveEntity {
-						can_ice_kick: move_.can_ice_kick,
-						slides_without_kick: move_.slides_without_kick,
-						is_kicked: true,
 						..MoveEntity::new(move_.entity_id, to, move_.direction)
 					});
 				},
@@ -415,9 +368,7 @@ impl Events {
 
 #[derive(Clone, Copy)]
 pub struct MoveEntity {
-	can_ice_kick: bool,
-	is_kicked: bool,
-	slides_without_kick: bool,
+	is_friction_push: bool,
 	entity_id: u32,
 	from: [isize; 2],
 	direction: Input,
@@ -426,12 +377,10 @@ pub struct MoveEntity {
 impl MoveEntity {
 	fn new(entity_id: u32, from: [isize; 2], direction: Input) -> Self {
 		MoveEntity {
+			is_friction_push: false,
 			entity_id,
 			from,
 			direction,
-			can_ice_kick: false,
-			slides_without_kick: false,
-			is_kicked: false,
 		}
 	}
 }
@@ -455,7 +404,7 @@ pub struct TileModification {
 	at: [isize; 2],
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Tile {
 	Floor,
 	Wall,
