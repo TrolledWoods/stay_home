@@ -1,8 +1,3 @@
-..%%%%...
-..%%%%p..
-..%%C%c..
-..%%%%...
-
 // Basic tutorial
 .......
 .p.b.H.
@@ -79,9 +74,9 @@ p.cb.
 %%%%%%%%%
 
 // Ice fun!
-...%#%..
-p.%%%%b.
-H..%%#%%
+...%#%...
+p.%%%%.b.
+H..%%#%%.
 
 // Silly ice skating level for fun(also teaches a little about kicking)
 %%%%%%%%%%%%
@@ -104,27 +99,27 @@ H..%%#%%
 ##%##
 ##S##
 
+// Ice physics 101
+#.p...###
+#........
+..###....
+..#.bH..#
+.c%%%%C.#
+#####...#
+
 // Kicking that requires preparation...
-...%.
-.b.%.
-.p#%.
-..c%c
-...%.
-###%#
-###S#
+..%.
+.b%.
+p#%.
+.c%c
+#.S.
 
-// Blocking stuff with ice
-p.##..
-..%%c.
-.b#...
-..#.H.
-......
-
-// Pushing things onto ice only works
-// if you're standing on ground.
-.....#...
-...c.#...
-.p...%.H.
-...b.#...
-.....#...
+// Ice ring
+....###
+..c...#
+..#%.c#
+#p%%%%S
+#c#%#..
+#c....b
+#......
 
