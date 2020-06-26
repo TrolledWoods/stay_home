@@ -1,32 +1,3 @@
-// Ice skating
-%%%%%%%%%
-%%%%%%%%%
-%P%%B%%H%
-%%%%%%%%%
-%%%%%%%%%
-
-// Ice fun!
-....%%%%%#.%
-.....%%%#%..
-.p.%%%%%%%b.
-....%%%%%#%.
-..H..%%%%#%%
-
-// Blocking stuff with ice
-p.##..
-..%%c.
-.b#...
-..#.H.
-......
-
-// Pushing things onto ice only works
-// if you're standing on ground.
-.....#...
-...c.#...
-.p...%.H.
-...b.#...
-.....#...
-
 // Basic tutorial
 .......
 .p.b.H.
@@ -70,12 +41,11 @@ H.##
 .p.c.S.b.
 .........
 
-// Even more cake stuff
-###.S.
-..b.b.
-.cp#..
-....#.
-.....H
+// More simple cake
+.b..S
+.c.#.
+p.cb.
+....S
 
 // Trouble!
 ....#
@@ -83,11 +53,12 @@ H.##
 .bb##
 ...##
 
-// complicate cake logic!
-.b..S
-.c.#.
-p.cb.
-....S
+// Even more cake stuff
+###.S.
+..b.b.
+.cp#..
+....#.
+.....H
 
 // cake feed tape!
 ###H.
@@ -95,10 +66,19 @@ p.cb.
 .c...
 #..pS
 
-// Simple ice
-..%%..
-.p%%b.
-.H%%..
+// Ice skating
+%%%%%%%%%
+%%%%%%%%%
+%P%%B%%H%
+%%%%%%%%%
+%%%%%%%%%
+
+// Ice fun!
+....%%%%%#.%
+.....%%%#%..
+.p.%%%%%%%b.
+....%%%%%#%.
+..H..%%%%#%%
 
 // More complicated ice stuff
 ...%.
@@ -108,3 +88,19 @@ p.cb.
 ...%.
 ###%#
 ###S#
+
+// Blocking stuff with ice
+p.##..
+..%%c.
+.b#...
+..#.H.
+......
+
+// Pushing things onto ice only works
+// if you're standing on ground.
+.....#...
+...c.#...
+.p...%.H.
+...b.#...
+.....#...
+

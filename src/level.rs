@@ -321,11 +321,19 @@ impl Level {
 			entity.x = to[0];
 			entity.y = to[1];
 
-			animations.push_back(Animation::Move {
-				entity_id: move_.entity_id,
-				from: move_.from,
-				to,
-			});
+			if move_.is_friction_push {
+				animations.push_back(Animation::Move {
+					entity_id: move_.entity_id,
+					from: move_.from,
+					to,
+				});
+			}else {
+				animations.push_back(Animation::IceSlide {
+					entity_id: move_.entity_id,
+					from: move_.from,
+					to,
+				});
+			}
 		}
 
 		self.active_events = new_events;
@@ -337,6 +345,7 @@ impl Level {
 pub enum Animation {
 	Move				{ entity_id: u32, from: [isize; 2], to: [isize; 2] },
 	IceKick				{ entity_id: u32, from: [isize; 2], to: [isize; 2] },
+	IceSlide            { entity_id: u32, from: [isize; 2], to: [isize; 2] },
 	FailedMove			{ entity_id: u32, from: [isize; 2], to: [isize; 2] },
 	TileModification	{ entity_id: u32, at: [isize; 2], new_tile: Tile },
 }

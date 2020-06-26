@@ -115,9 +115,14 @@ impl LevelGraphics {
 		time: f32,
 		dt: f32,
 	) {
+		let size = if (level.height as f32) > (level.width as f32 / aspect) {
+			1.0 / level.height as f32
+		} else {
+			aspect / level.width as f32
+		};
 		let camera_matrix = [
-			[1.0 / (level.height as f32 * aspect), 0.0, 0.0f32],
-			[0.0, 1.0 / (level.height as f32), 0.0f32],
+			[1.5 * size / aspect, 0.0, 0.0f32],
+			[0.0, 1.5 * size, 0.0f32],
 			[0.0, 0.0, 1.0f32],
 		];
 
@@ -157,6 +162,19 @@ impl LevelGraphics {
 					to: [to_x, to_y],
 				} => {
 					let t = (time *  time) * (3.0 - 2.0 * time);
+					let lerp_x = lerp(from_x as f32, to_x as f32, t);
+					let lerp_y = lerp(from_y as f32, to_y as f32, t);
+
+					// @Cleanup: Don't unwrap here, dummy!
+					self.entities.get_mut(&entity_id).unwrap().position 
+						= [lerp_x, lerp_y];
+				}
+				Animation::IceSlide {
+					entity_id,
+					from: [from_x, from_y],
+					to: [to_x, to_y],
+				} => {
+					let t = time;
 					let lerp_x = lerp(from_x as f32, to_x as f32, t);
 					let lerp_y = lerp(from_y as f32, to_y as f32, t);
 
