@@ -158,7 +158,7 @@ impl LevelPlayer {
 				self.level.input(input);
 			}
 
-			if !self.level.active_events.empty() {
+			if !self.level.data.active_events.empty() {
 				self.update_timer = 1.0;
 				self.level.update(&mut self.level_graphics.animations);
 			}

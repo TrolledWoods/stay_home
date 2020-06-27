@@ -22,7 +22,7 @@ impl LevelGraphics {
 		let (vertices, indices) = generate_level_graphics(graphics, level);
 
 		let mut entities = HashMap::new();
-		for (id, entity) in level.entities.iter() {
+		for (id, entity) in level.data.entities.iter() {
 			let uv = graphics.textures.get_uv(entity.kind.get_texture());
 			let vertices = VertexBuffer::new(&graphics.display,
 				&[TextureVertex {
@@ -70,7 +70,7 @@ impl LevelGraphics {
 		self.vertices = vertices;
 		self.indices = indices;
 		self.entities.clear();
-		for (id, entity) in level.entities.iter() {
+		for (id, entity) in level.data.entities.iter() {
 			let uv = graphics.textures.get_uv(entity.kind.get_texture());
 			let vertices = VertexBuffer::new(&graphics.display,
 				&[TextureVertex {
@@ -115,10 +115,10 @@ impl LevelGraphics {
 		time: f32,
 		dt: f32,
 	) {
-		let size = if (level.height as f32) > (level.width as f32 / aspect) {
-			1.0 / level.height as f32
+		let size = if (level.data.height as f32) > (level.data.width as f32 / aspect) {
+			1.0 / level.data.height as f32
 		} else {
-			aspect / level.width as f32
+			aspect / level.data.width as f32
 		};
 		let camera_matrix = [
 			[1.5 * size / aspect, 0.0, 0.0f32],
@@ -129,7 +129,7 @@ impl LevelGraphics {
 		let model_transform = [
 			[1.0, 0.0, 0.0f32],
 			[0.0, 1.0, 0.0f32],
-			[-(level.width as f32) / 2.0, -(level.height as f32) / 2.0, 1.0f32],
+			[-(level.data.width as f32) / 2.0, -(level.data.height as f32) / 2.0, 1.0f32],
 		];
 
 		// If the tilemap has changed, change the graphics too!
@@ -288,9 +288,9 @@ fn generate_level_graphics(
 	let mut vertices = Vec::new();
 	let mut indices = Vec::new();
 
-	for (i, tile) in level.tiles.iter().copied().enumerate() {
-		let x = i % level.width;
-		let y = i / level.width;
+	for (i, tile) in level.data.tiles.iter().copied().enumerate() {
+		let x = i % level.data.width;
+		let y = i / level.data.width;
 
 		let uv = graphics.textures.get_uv(match tile {
 			Tile::Floor => TextureId::Floor,

@@ -4,23 +4,28 @@ use std::collections::{HashMap, VecDeque};
 
 #[derive(Clone, Default)]
 pub struct Level {
-	pub n_humans: usize,
-
-	pub width: usize,
-	pub height: usize,
-	pub tiles: Vec<Tile>,
-
-	pub active_events: Events,
 	old_events: Option<Events>,
 
 	pub n_tile_changes: u32,
 
 	entity_id_ctr: u32,
-	pub entities: HashMap<u32, Entity>,
 
 	pub has_won: bool,
 
+	pub data: LevelData,
+
 	player_id: u32,
+}
+
+// All the data for a level state
+#[derive(Clone, Default)]
+pub struct LevelData {
+	pub entities: HashMap<u32, Entity>,
+	pub active_events: Events,
+	pub width: usize,
+	pub height: usize,
+	pub tiles: Vec<Tile>,
+	pub n_humans: usize,
 }
 
 impl Level {
@@ -58,16 +63,16 @@ impl Level {
 
 			making_level = true;
 
-			if level.width == 0 { 
-				level.width = line.len(); 
-			}else if level.width != line.len() { 
+			if level.data.width == 0 { 
+				level.data.width = line.len(); 
+			}else if level.data.width != line.len() { 
 				return Err(format!("Expected the same width for every line")); 
 			}
 
-			level.height += 1;
+			level.data.height += 1;
 
 			for (x, char_) in line.chars().enumerate() {
-				level.tiles.push(match char_ {
+				level.data.tiles.push(match char_ {
 					// Entities
 					'p' | 'P' => {
 						if has_player {
@@ -77,21 +82,21 @@ impl Level {
 
 						has_player = true;
 
-						level.entities.insert(level.entity_id_ctr, 
+						level.data.entities.insert(level.entity_id_ctr, 
 							Entity::new(x as isize, y as isize, EntityKind::Player));
 						level.player_id = level.entity_id_ctr;
 						level.entity_id_ctr += 1;
 						if char_.is_uppercase() { Tile::Ice } else { Tile::Floor }
 					}
 					'b' | 'B' => {
-						level.entities.insert(level.entity_id_ctr, 
+						level.data.entities.insert(level.entity_id_ctr, 
 							Entity::new(x as isize, y as isize, EntityKind::Human));
 						level.entity_id_ctr += 1;
-						level.n_humans += 1;
+						level.data.n_humans += 1;
 						if char_.is_uppercase() { Tile::Ice } else { Tile::Floor }
 					}
 					'c' | 'C' => {
-						level.entities.insert(level.entity_id_ctr, 
+						level.data.entities.insert(level.entity_id_ctr, 
 							Entity::new(x as isize, y as isize, EntityKind::Cake));
 						level.entity_id_ctr += 1;
 						if char_.is_uppercase() { Tile::Ice } else { Tile::Floor }
@@ -121,39 +126,39 @@ impl Level {
 		// @Cleanup: Direction enum!
 		if input == Input::Confirm { return; }
 
-		for move_ in self.active_events.moves.iter() {
+		for move_ in self.data.active_events.moves.iter() {
 			if move_.entity_id == self.player_id {
 				println!("Cannot create a duplicate move!");
 				return;
 			}
 		}
 
-		let entity = self.entities.get(&self.player_id).unwrap();
+		let entity = self.data.entities.get(&self.player_id).unwrap();
 
-		let is_friction_push = match self.get_tile(entity.x, entity.y).unwrap() {
+		let is_friction_push = match self.get_tile([entity.x, entity.y]).unwrap() {
 			Tile::Ice => false,
 			_ => true
 		};
 
-		self.active_events.moves.push(MoveEntity {
+		self.data.active_events.moves.push(MoveEntity {
 			is_friction_push,
 			..MoveEntity::new(self.player_id, [entity.x, entity.y], input)
 		});
 	}
 
 	pub fn tile_is_solid(&self, pos: [isize; 2]) -> bool {
-		if pos[0] < 0 || pos[0] as usize >= self.width || 
-			pos[1] < 0 || pos[1] as usize >= self.height 
+		if pos[0] < 0 || pos[0] as usize >= self.data.width || 
+			pos[1] < 0 || pos[1] as usize >= self.data.height 
 		{
 			return true;
 		}
 
-		match self.tiles[pos[0] as usize + pos[1] as usize * self.width] {
+		match self.get_tile(pos).unwrap() {
 			Tile::Wall | Tile::HappyHome => return true,
 			_ => (),
 		}
 
-		for entity in self.entities.values() {
+		for entity in self.data.entities.values() {
 			if entity.x == pos[0] && entity.y == pos[1] {
 				return true;
 			}
@@ -163,7 +168,7 @@ impl Level {
 	}
 
 	fn get_entity_at_tile(&self, pos: [isize; 2]) -> Option<u32> {
-		for (&id, entity) in self.entities.iter() {
+		for (&id, entity) in self.data.entities.iter() {
 			if entity.x == pos[0] && entity.y == pos[1] {
 				return Some(id);
 			}
@@ -171,19 +176,31 @@ impl Level {
 		None
 	}
 
-	pub fn get_tile(&self, x: isize, y: isize) -> Option<Tile> {
-		if x < 0 || x as usize >= self.width 
-			|| y < 0 || y as usize >= self.height {
+	pub fn get_tile(&self, pos: [isize; 2]) -> Option<Tile> {
+		if pos[0] < 0 || pos[0] as usize >= self.data.width 
+			|| pos[1] < 0 || pos[1] as usize >= self.data.height {
 			return None;
 		}
 
 		// @Cleanup: get_unchecked?? Don't feel like doing unsafe for now.
-		Some(self.tiles[x as usize + y as usize * self.width])
+		Some(self.data.tiles[pos[0] as usize + pos[1] as usize * self.data.width])
+	}
+
+	pub fn set_tile(&mut self, pos: [isize; 2], tile: Tile) -> bool {
+		if pos[0] < 0 || pos[0] as usize >= self.data.width 
+			|| pos[1] < 0 || pos[1] as usize >= self.data.height {
+			return false;
+		}
+
+		// @Cleanup: get_unchecked?? Don't feel like doing unsafe for now.
+		self.data.tiles[pos[0] as usize + pos[1] as usize * self.data.width] 
+			= tile;
+		true
 	}
 
 	pub fn update(&mut self, animations: &mut VecDeque<Animation>) {
 		let mut events = std::mem::replace(
-			&mut self.active_events, 
+			&mut self.data.active_events, 
 			self.old_events.take().unwrap_or_else(|| Events::new()),
 		);
 		let mut new_events = Events::new();
@@ -191,8 +208,7 @@ impl Level {
 		// Tile modification
 		for tile_modification in events.tile_modifications.drain(..) {
 			let at = tile_modification.at;
-			self.tiles[at[0] as usize + at[1] as usize * self.width] =
-				tile_modification.into;
+			assert!(self.set_tile(at, tile_modification.into));
 			self.n_tile_changes += 1;
 
 			animations.push_back(Animation::TileModification {
@@ -202,11 +218,11 @@ impl Level {
 			});
 
 			if let Some(entity) = 
-				self.entities.remove(&tile_modification.sacrifice) 
+				self.data.entities.remove(&tile_modification.sacrifice) 
 			{
 				if entity.kind == EntityKind::Human {
-					self.n_humans -= 1;
-					if self.n_humans == 0 {
+					self.data.n_humans -= 1;
+					if self.data.n_humans == 0 {
 						self.has_won = true;
 					}
 				}
@@ -219,8 +235,8 @@ impl Level {
 			let move_ = events.moves[index];
 			let to = move_.to();
 			if let Some(id) = self.get_entity_at_tile(to) {
-				let one_self = self.entities.get(&move_.entity_id).unwrap();
-				let entity = self.entities.get(&id).unwrap();
+				let one_self = self.data.entities.get(&move_.entity_id).unwrap();
+				let entity = self.data.entities.get(&id).unwrap();
 
 				// If the things in question is already moving out of the way,
 				// increase the priority of that, and then move on!
@@ -243,8 +259,8 @@ impl Level {
 				}
 				
 				match (
-					self.get_tile(one_self.x, one_self.y).unwrap(),
-					self.get_tile(entity.x,   entity.y  ).unwrap(),
+					self.get_tile([one_self.x, one_self.y]).unwrap(),
+					self.get_tile([entity.x,   entity.y  ]).unwrap(),
 				) {
 					(_, Tile::Ice) if !move_.is_friction_push => {
 						// If something isn't based on friction, and the target
@@ -300,8 +316,8 @@ impl Level {
 				continue;
 			}
 
-			let entity = self.entities.get_mut(&move_.entity_id).unwrap();
-			match self.tiles[to[0] as usize + to[1] as usize * self.width] {
+			let entity = self.data.entities.get_mut(&move_.entity_id).unwrap();
+			match self.data.tiles[to[0] as usize + to[1] as usize * self.data.width] {
 				Tile::Ice => {
 					new_events.moves.push(MoveEntity {
 						..MoveEntity::new(move_.entity_id, to, move_.direction)
@@ -342,7 +358,7 @@ impl Level {
 			}
 		}
 
-		self.active_events = new_events;
+		self.data.active_events = new_events;
 		self.old_events = Some(events);
 	}
 }
@@ -425,6 +441,7 @@ pub enum Tile {
 
 #[derive(Clone, Copy)]
 pub struct Entity {
+	// @Cleanup: Coordinates with an array
 	pub x: isize,
 	pub y: isize,
 	pub kind: EntityKind,
