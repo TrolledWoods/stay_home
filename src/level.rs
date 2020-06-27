@@ -90,6 +90,12 @@ impl Level {
 						level.entity_id_ctr += 1;
 						if char_.is_uppercase() { Tile::Ice } else { Tile::Floor }
 					}
+					'g' | 'G' => {
+						level.data.entities.insert(level.entity_id_ctr, 
+							Entity::new(x as isize, y as isize, EntityKind::BucketOfGoop));
+						level.entity_id_ctr += 1;
+						if char_.is_uppercase() { Tile::IceWithGoop } else { Tile::FloorWithGoop }
+					}
 					'b' | 'B' => {
 						level.data.entities.insert(level.entity_id_ctr, 
 							Entity::new(x as isize, y as isize, EntityKind::Human));
@@ -224,7 +230,6 @@ impl Level {
 	pub fn input(&mut self, input: Direction) {
 		for move_ in self.data.active_events.moves.iter() {
 			if move_.entity_id == self.player_id {
-				println!("Cannot create a duplicate move!");
 				return;
 			}
 		}
@@ -232,7 +237,7 @@ impl Level {
 		let entity = self.data.entities.get(&self.player_id).unwrap();
 
 		let is_friction_push = match self.get_tile([entity.x, entity.y]).unwrap() {
-			Tile::Ice => false,
+			Tile::Ice | Tile::IceWithGoop => false,
 			_ => true
 		};
 
@@ -358,12 +363,33 @@ impl Level {
 						continue 'outer;
 					}
 				}
+
+				if (one_self.kind == EntityKind::HumanWithGoop && entity.kind == EntityKind::Cake) ||
+					(one_self.kind == EntityKind::Cake && entity.kind == EntityKind::HumanWithGoop) 
+				{
+					// The goop child eats the cake!
+					let other = self.data.entities.get_mut(&id).unwrap();
+					other.kind = EntityKind::Human;
+					let other_pos = [other.x, other.y];
+					let me = self.data.entities.get_mut(&move_.entity_id).unwrap();
+					let me_pos = [me.x, me.y];
+					animations.push_back(Animation::Eat {
+						from: me_pos,
+						to: other_pos,
+						eater: id,
+						eating: move_.entity_id,
+					});
+					animations.push_back(Animation::Goopify { entity_id: id });
+					events.moves.remove(index);
+					self.data.entities.remove(&move_.entity_id);
+					continue;
+				}
 				
 				match (
 					self.get_tile([one_self.x, one_self.y]).unwrap(),
 					self.get_tile([entity.x,   entity.y  ]).unwrap(),
 				) {
-					(_, Tile::Ice) if !move_.is_friction_push => {
+					(_, Tile::Ice) | (_, Tile::IceWithGoop) if !move_.is_friction_push => {
 						// If something isn't based on friction, and the target
 						// is on ice, then transfer the energy, don't push!
 						events.moves.remove(index);
@@ -373,11 +399,12 @@ impl Level {
 							from: [one_self.x, one_self.y],
 							to:   [entity.x,   entity.y  ],
 						});
-						new_events.moves.push(MoveEntity::new(
+						let move_ = MoveEntity::new(
 							id,
 							[entity.x, entity.y],
 							move_.direction,
-						));
+						);
+						new_events.moves.push(move_);
 					}
 					// (_, _) if !move_.is_friction_push => {
 					// 	// Cannot push things that are not on ice
@@ -386,13 +413,15 @@ impl Level {
 					// }
 					(_, _) => {
 						// Just normal pushing
-						events.moves.push(MoveEntity {
+						let move_ = MoveEntity {
 							is_friction_push: true,
 							..MoveEntity::new(id, [entity.x, entity.y], move_.direction)
-						});
+						};
+						events.moves.push(move_);
 						index += 1;
 					}
-				}
+				};
+
 			} else {
 				// No pushing!
 				index += 1;
@@ -417,12 +446,38 @@ impl Level {
 				continue;
 			}
 
+			let entity = self.data.entities.get(&move_.entity_id).unwrap();
+			if entity.kind == EntityKind::BucketOfGoop {
+				match self.get_tile(move_.to()).unwrap() {
+					Tile::Ice => {
+						self.set_tile(move_.to(), Tile::IceWithGoop);
+						self.n_tile_changes += 1;
+					}
+					Tile::Floor => {
+						self.set_tile(move_.to(), Tile::FloorWithGoop);
+						self.n_tile_changes += 1;
+					}
+					_ => (),
+				}
+			}
+
 			let entity = self.data.entities.get_mut(&move_.entity_id).unwrap();
 			match self.data.tiles[to[0] as usize + to[1] as usize * self.data.width] {
 				Tile::Ice => {
 					new_events.moves.push(MoveEntity {
 						..MoveEntity::new(move_.entity_id, to, move_.direction)
 					});
+				},
+				Tile::IceWithGoop => {
+					new_events.moves.push(MoveEntity {
+						..MoveEntity::new(move_.entity_id, to, move_.direction)
+					});
+					entity.goopify();
+					animations.push_back(Animation::Goopify { entity_id: move_.entity_id });
+				}
+				Tile::FloorWithGoop => {
+					entity.goopify();
+					animations.push_back(Animation::Goopify { entity_id: move_.entity_id });
 				},
 				Tile::SadHome if entity.kind == EntityKind::Cake => {
 					new_events.tile_modifications.push(TileModification {
@@ -466,6 +521,13 @@ impl Level {
 
 #[derive(Clone, Copy)]
 pub enum Animation {
+	Goopify				{ entity_id: u32 },
+	Eat {
+		from: [isize; 2],
+		to: [isize; 2],
+		eating: u32,
+		eater: u32,
+	},
 	Move				{ entity_id: u32, from: [isize; 2], to: [isize; 2] },
 	IceKick				{ entity_id: u32, from: [isize; 2], to: [isize; 2] },
 	IceSlide            { entity_id: u32, from: [isize; 2], to: [isize; 2] },
@@ -535,6 +597,8 @@ pub enum Tile {
 	Home,
 	HappyHome,
 	Ice,
+	FloorWithGoop,
+	IceWithGoop,
 }
 
 #[derive(Clone, Copy)]
@@ -549,6 +613,14 @@ impl Entity {
 	pub fn new(x: isize, y: isize, kind: EntityKind) -> Self {
 		Entity { x, y, kind }
 	}
+
+	pub fn goopify(&mut self) {
+		match self.kind {
+			EntityKind::Cake => self.kind = EntityKind::CakeWithGoop,
+			EntityKind::Human => self.kind = EntityKind::HumanWithGoop,
+			_ => (),
+		}
+	}
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -556,6 +628,9 @@ pub enum EntityKind {
 	Player,
 	Human,
 	Cake,
+	BucketOfGoop,
+	HumanWithGoop,
+	CakeWithGoop,
 }
 
 impl EntityKind {
@@ -564,6 +639,9 @@ impl EntityKind {
 			EntityKind::Player => Texture::Player,
 			EntityKind::Human => Texture::Human,
 			EntityKind::Cake => Texture::Cake,
+			EntityKind::BucketOfGoop => Texture::BucketOfGoop,
+			EntityKind::HumanWithGoop => Texture::HumanWithGoop,
+			EntityKind::CakeWithGoop => Texture::CakeWithGoop,
 		}
 	}
 }

@@ -14,6 +14,11 @@ pub enum Texture {
 	SadHome = 7,
 	Player = 8,
 	Ice = 9,
+	HumanWithGoop = 10,
+	CakeWithGoop = 11,
+	FloorWithGoop = 12,
+	IceWithGoop = 13,
+	BucketOfGoop = 14,
 }
 
 pub struct Textures {
@@ -39,6 +44,11 @@ impl Textures {
 			"sad_home.png",
 			"player.png",
 			"ice.png",
+			"human_with_goop.png",
+			"cake_with_goop.png",
+			"floor_with_goop.png",
+			"ice_with_goop.png",
+			"bucket_of_goop.png",
 		];
 
 		let mut images = Vec::with_capacity(IMAGE_PATHS.len());

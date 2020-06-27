@@ -221,6 +221,47 @@ impl LevelGraphics {
 					self.entities.get_mut(&entity_id).unwrap().position 
 						= [lerp_x, lerp_y];
 				}
+				Animation::Eat { 
+					eating, 
+					from: [from_x, from_y], 
+					to: [to_x, to_y],
+					..
+				} => {
+					let t = (time * time) * (3.0 - 2.0 * time);
+					let mut entity =
+						self.entities.get_mut(&eating).unwrap();
+					entity.position[0] = lerp(from_x as f32, to_x as f32, t);
+					entity.position[1] = lerp(from_y as f32, to_y as f32, t);
+					entity.size = 1.0 - t;
+				}
+				Animation::Goopify { entity_id } => {
+					let entity = level.data.entities.get(&entity_id).unwrap();
+					let gfx = self.entities.get_mut(&entity_id).unwrap();
+					// @Cleanup: Put the entity graphics creation in a function
+					let uv = graphics.textures.get_uv(entity.kind.get_texture());
+					gfx.vertex_buffer = VertexBuffer::new(&graphics.display,
+						&[TextureVertex {
+							position: [-0.5, -0.5, 1.0],
+							uv: [uv.left, uv.bottom],
+						},
+						TextureVertex {
+							position: [-0.5, 0.5, 1.0],
+							uv: [uv.left, uv.top],
+						},
+						TextureVertex {
+							position: [0.5, 0.5, 1.0],
+							uv: [uv.right, uv.top],
+						},
+						TextureVertex {
+							position: [0.5, -0.5, 1.0],
+							uv: [uv.right, uv.bottom],
+						}]
+					).unwrap();
+					gfx.index_buffer = IndexBuffer::new(&graphics.display,
+						index::PrimitiveType::TrianglesList,
+						&[0, 1, 2, 0, 2, 3u32],
+					).unwrap();
+				}
 			}
 		}
 
@@ -299,6 +340,8 @@ fn generate_level_graphics(
 			Tile::HappyHome => TextureId::HappyHome,
 			Tile::SadHome => TextureId::SadHome,
 			Tile::Ice => TextureId::Ice,
+			Tile::FloorWithGoop => TextureId::FloorWithGoop,
+			Tile::IceWithGoop => TextureId::IceWithGoop,
 		});
 		let vert_index = vertices.len() as u32;
 		vertices.push(TextureVertex {
