@@ -234,11 +234,10 @@ impl LevelGraphics {
 					entity.position[1] = lerp(from_y as f32, to_y as f32, t);
 					entity.size = 1.0 - t;
 				}
-				Animation::Goopify { entity_id } => {
-					let entity = level.data.entities.get(&entity_id).unwrap();
+				Animation::Goopify { entity_id, kind } => {
 					let gfx = self.entities.get_mut(&entity_id).unwrap();
 					// @Cleanup: Put the entity graphics creation in a function
-					let uv = graphics.textures.get_uv(entity.kind.get_texture());
+					let uv = graphics.textures.get_uv(kind.get_texture());
 					gfx.vertex_buffer = VertexBuffer::new(&graphics.display,
 						&[TextureVertex {
 							position: [-0.5, -0.5, 1.0],

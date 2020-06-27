@@ -311,30 +311,6 @@ impl Level {
 		);
 		let mut new_events = Events::new();
 
-		// Tile modification
-		for tile_modification in events.tile_modifications.drain(..) {
-			let at = tile_modification.at;
-			assert!(self.set_tile(at, tile_modification.into));
-			self.n_tile_changes += 1;
-
-			animations.push_back(Animation::TileModification {
-				entity_id: tile_modification.sacrifice,
-				at,
-				new_tile: tile_modification.into,
-			});
-
-			if let Some(entity) = 
-				self.data.entities.remove(&tile_modification.sacrifice) 
-			{
-				if entity.kind == EntityKind::Human {
-					self.data.n_humans -= 1;
-					if self.data.n_humans == 0 {
-						self.has_won = true;
-					}
-				}
-			}
-		}
-
 		// Pushing things
 		let mut index = 0;
 		'outer: while index < events.moves.len() {
@@ -379,7 +355,7 @@ impl Level {
 						eater: id,
 						eating: move_.entity_id,
 					});
-					animations.push_back(Animation::Goopify { entity_id: id });
+					animations.push_back(Animation::Goopify { entity_id: id, kind: EntityKind::Human });
 					events.moves.remove(index);
 					self.data.entities.remove(&move_.entity_id);
 					continue;
@@ -473,26 +449,12 @@ impl Level {
 						..MoveEntity::new(move_.entity_id, to, move_.direction)
 					});
 					entity.goopify();
-					animations.push_back(Animation::Goopify { entity_id: move_.entity_id });
+					animations.push_back(Animation::Goopify { entity_id: move_.entity_id, kind: entity.kind });
 				}
 				Tile::FloorWithGoop => {
 					entity.goopify();
-					animations.push_back(Animation::Goopify { entity_id: move_.entity_id });
+					animations.push_back(Animation::Goopify { entity_id: move_.entity_id, kind: entity.kind });
 				},
-				Tile::SadHome if entity.kind == EntityKind::Cake => {
-					new_events.tile_modifications.push(TileModification {
-						into: Tile::Home,
-						sacrifice: move_.entity_id,
-						at: to,
-					});
-				}
-				Tile::Home if entity.kind == EntityKind::Human => {
-					new_events.tile_modifications.push(TileModification {
-						into: Tile::HappyHome,
-						sacrifice: move_.entity_id,
-						at: to,
-					});
-				}
 				_ => (),
 			}
 
@@ -514,6 +476,42 @@ impl Level {
 			}
 		}
 
+		// Tile modification
+		let mut entities_to_remove = Vec::new();
+		for (&entity_id, entity) in self.data.entities.iter() {
+			match (entity.kind, self.data.tiles[entity.x as usize + entity.y as usize * self.data.width]) {
+				(EntityKind::Human, Tile::Home) => {
+					self.data.tiles[entity.x as usize + entity.y as usize * self.data.width] = Tile::HappyHome;
+					self.n_tile_changes += 1;
+					animations.push_back(Animation::TileModification {
+						entity_id,
+						at: [entity.x, entity.y],
+						new_tile: Tile::HappyHome,
+					});
+					self.data.n_humans -= 1;
+					if self.data.n_humans == 0 {
+						self.has_won = true;
+					}
+					entities_to_remove.push(entity_id);
+				}
+				(EntityKind::Cake, Tile::SadHome) => {
+					self.data.tiles[entity.x as usize + entity.y as usize * self.data.width] = Tile::Home;
+					self.n_tile_changes += 1;
+					animations.push_back(Animation::TileModification {
+						entity_id,
+						at: [entity.x, entity.y],
+						new_tile: Tile::Home,
+					});
+					entities_to_remove.push(entity_id);
+				}
+				_ => (),
+			}
+		}
+
+		for entity in entities_to_remove {
+			self.data.entities.remove(&entity);
+		}
+
 		self.data.active_events = new_events;
 		self.old_events = Some(events);
 	}
@@ -521,7 +519,7 @@ impl Level {
 
 #[derive(Clone, Copy)]
 pub enum Animation {
-	Goopify				{ entity_id: u32 },
+	Goopify				{ entity_id: u32, kind: EntityKind },
 	Eat {
 		from: [isize; 2],
 		to: [isize; 2],
