@@ -433,6 +433,15 @@ impl Level {
 						self.set_tile(move_.to(), Tile::FloorWithGoop);
 						self.n_tile_changes += 1;
 					}
+					Tile::Home | Tile::SadHome => {
+						// Cannot move Bucket of Goop onto houses.
+						animations.push_back(Animation::FailedMove {
+							entity_id: move_.entity_id,
+							from: move_.from,
+							to,
+						});
+						continue;
+					}
 					_ => (),
 				}
 			}
@@ -519,6 +528,8 @@ impl Level {
 
 #[derive(Clone, Copy)]
 pub enum Animation {
+	// @Cleanup: Unify / Remove some of these, it feels as if some of
+	// them are redundant, or are used in contexts where they shouldn't.
 	Goopify				{ entity_id: u32, kind: EntityKind },
 	Eat {
 		from: [isize; 2],

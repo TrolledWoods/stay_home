@@ -1,9 +1,3 @@
-p...#
-..g.#
-.b.HH
-.b.c#
-....#
-
 // Basic tutorial
 .......
 .p.b.H.
@@ -145,6 +139,7 @@ p#%.
 #c...c.
 #......
 
+// Goop introduction
 ...#...
 ...#b..
 .pg%%%.
@@ -152,3 +147,17 @@ p#%.
 .c.....
 ...#.H.
 
+// Moving past houses with goop
+p...#
+.bg.#
+.bcHH
+....#
+
+
+// A wall of goop!
+..#...
+.gc.b.
+p.....
+.##...
+.HH.b.
+#####.
