@@ -14,6 +14,8 @@ pub struct Level {
 
 	pub data: LevelData,
 
+	pub undo_stack: Vec<LevelData>,
+
 	player_id: u32,
 }
 
@@ -125,6 +127,7 @@ impl Level {
 	pub fn input(&mut self, input: Input) {
 		// @Cleanup: Direction enum!
 		if input == Input::Confirm { return; }
+		self.undo_stack.push(self.data.clone());
 
 		for move_ in self.data.active_events.moves.iter() {
 			if move_.entity_id == self.player_id {

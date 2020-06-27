@@ -86,6 +86,16 @@ impl LevelPlayer {
 			}
 			level_changed = true;
 		}
+		if input == Input::Undo {
+			if let Some(data) = self.level.undo_stack.pop() {
+				self.level.data = data;
+				self.level_graphics
+					.reset(graphics, &self.level);
+			} else {
+				println!("Nothing to undo");
+			}
+			return Ok(());
+		}
 		if input == Input::NextLevel || 
 			(input == Input::Confirm && self.level.has_won)
 		{

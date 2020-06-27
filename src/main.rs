@@ -30,6 +30,7 @@ pub enum Input {
 	MoveDown,
 	Confirm,
 	Restart,
+	Undo,
 	NextLevel,
 	PrevLevel,
 }
@@ -56,6 +57,7 @@ fn main() {
 	keybindings.insert(28, Input::Confirm);
 	keybindings.insert(57, Input::Confirm);
 	keybindings.insert(56, Input::Confirm);
+	keybindings.insert(44, Input::Undo);
 	keybindings.insert(62, Input::PrevLevel);
 	keybindings.insert(63, Input::NextLevel);
 	keybindings.insert(19, Input::Restart); // 'R'
