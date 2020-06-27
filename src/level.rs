@@ -536,19 +536,17 @@ pub enum Animation {
 #[derive(Clone, Default)]
 pub struct Events {
 	pub moves: Vec<MoveEntity>,
-	pub tile_modifications: Vec<TileModification>,
 }
 
 impl Events {
 	fn new() -> Events {
 		Events {
 			moves: Vec::new(),
-			tile_modifications: Vec::new(),
 		}
 	}
 
 	pub fn empty(&self) -> bool {
-		self.moves.len() == 0 && self.tile_modifications.len() == 0
+		self.moves.len() == 0
 	}
 }
 
@@ -578,13 +576,6 @@ impl MoveEntity {
 			Direction::Down  => [self.from[0]    , self.from[1] - 1],
 		}
 	}
-}
-
-#[derive(Clone, Copy)]
-pub struct TileModification {
-	into: Tile,
-	sacrifice: u32,
-	at: [isize; 2],
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
