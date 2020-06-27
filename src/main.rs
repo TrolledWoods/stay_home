@@ -11,7 +11,7 @@ mod prelude {
 	pub use crate::level::Level;
 	pub use crate::level_graphics::LevelGraphics;
 	pub use crate::graphics::Graphics;
-	pub use crate::{Input, lerp};
+	pub use crate::{Input, Direction, lerp};
 }
 
 use prelude::*;
@@ -23,16 +23,21 @@ pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Direction {
+	Left,
+	Right,
+	Up,
+	Down,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Input {
-	MoveLeft,
-	MoveRight,
-	MoveUp,
-	MoveDown,
+	Move(Direction),
 	Confirm,
-	Restart,
 	Undo,
 	NextLevel,
 	PrevLevel,
+	Randomize,
 }
 
 fn main() {
@@ -50,17 +55,15 @@ fn main() {
     let display = glium::Display::new(wb, cb, &events_loop).unwrap();
 
 	let mut keybindings = HashMap::new();
-	keybindings.insert(72, Input::MoveUp);
-	keybindings.insert(75, Input::MoveLeft);
-	keybindings.insert(80, Input::MoveDown);
-	keybindings.insert(77, Input::MoveRight);
-	keybindings.insert(28, Input::Confirm);
+	keybindings.insert(72, Input::Move(Direction::Up));
+	keybindings.insert(75, Input::Move(Direction::Left));
+	keybindings.insert(80, Input::Move(Direction::Down));
+	keybindings.insert(77, Input::Move(Direction::Right));
 	keybindings.insert(57, Input::Confirm);
-	keybindings.insert(56, Input::Confirm);
 	keybindings.insert(44, Input::Undo);
 	keybindings.insert(62, Input::PrevLevel);
 	keybindings.insert(63, Input::NextLevel);
-	keybindings.insert(19, Input::Restart); // 'R'
+	keybindings.insert(59, Input::Randomize);
 
 	let mut graphics = graphics::Graphics::new(&display);
 

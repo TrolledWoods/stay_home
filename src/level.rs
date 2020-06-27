@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use crate::textures::Texture;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 #[derive(Clone, Default)]
 pub struct Level {
@@ -124,11 +124,104 @@ impl Level {
 		Ok(levels)
 	}
 
-	pub fn input(&mut self, input: Input) {
-		// @Cleanup: Direction enum!
-		if input == Input::Confirm { return; }
-		self.undo_stack.push(self.data.clone());
+	pub fn randomized() -> Level {
+		let width = 8;
+		let height = 8;
+		let n_house = 3;
+		let n_sad_house = 2;
+		let n_extra_cake = 1;
+		let n_wall = 10;
+		let n_ice = 10;
 
+		let mut level: Level = Default::default();
+		level.data.width = width;
+		level.data.height = height;
+		level.data.tiles = vec![
+			Tile::Floor; 
+			level.data.width * level.data.height
+		];
+
+		let mut tiles = HashSet::new();
+		for x in 0..level.data.width {
+			for y in 0..level.data.height {
+				tiles.insert([x as isize, y as isize]);
+			}
+		}
+		let mut tiles = tiles.drain();
+
+		for _ in 0..n_wall {
+			level.set_tile(tiles.next().unwrap(), Tile::Wall);
+		}
+
+		for _ in 0..n_ice {
+			level.set_tile(tiles.next().unwrap(), Tile::Ice);
+		}
+		for _ in 0..n_house {
+			level.set_tile(tiles.next().unwrap(), Tile::Home);
+		}
+		for _ in 0..n_sad_house {
+			level.set_tile(tiles.next().unwrap(), Tile::SadHome);
+		}
+
+		let old_tiles = tiles;
+		let mut tiles = HashSet::new();
+		for tile in old_tiles {
+			if tile[0] == 0 || tile[1] == 0 
+				|| tile[0] == width as isize - 1 || tile[1] == height as isize - 1 
+			{
+				continue;
+			}
+
+			// Cornders not allowed!
+			if level.tile_is_solid([tile[0] - 1, tile[1]]) &&
+				level.tile_is_solid([tile[0], tile[1] - 1]) {
+				continue;
+			}
+			if level.tile_is_solid([tile[0] + 1, tile[1]]) &&
+				level.tile_is_solid([tile[0], tile[1] - 1]) {
+				continue;
+			}
+			if level.tile_is_solid([tile[0] - 1, tile[1]]) &&
+				level.tile_is_solid([tile[0], tile[1] + 1]) {
+				continue;
+			}
+			if level.tile_is_solid([tile[0] + 1, tile[1]]) &&
+				level.tile_is_solid([tile[0], tile[1] + 1]) {
+				continue;
+			}
+
+			tiles.insert(tile);
+		}
+		let mut tiles = tiles.drain();
+
+		// Player!
+		let [x, y] = tiles.next().unwrap();
+		level.data.entities.insert(level.entity_id_ctr, 
+			Entity::new(x, y, EntityKind::Player));
+		level.player_id = level.entity_id_ctr;
+		level.entity_id_ctr += 1;
+
+		// Cakes
+		for _ in 0..(n_sad_house + n_extra_cake) {
+			let [x, y] = tiles.next().unwrap();
+			level.data.entities.insert(level.entity_id_ctr, 
+				Entity::new(x, y, EntityKind::Cake));
+			level.entity_id_ctr += 1;
+		}
+
+		// Humans
+		for _ in 0..(n_house + n_sad_house) {
+			let [x, y] = tiles.next().unwrap();
+			level.data.entities.insert(level.entity_id_ctr, 
+				Entity::new(x, y, EntityKind::Human));
+			level.entity_id_ctr += 1;
+			level.data.n_humans += 1;
+		}
+
+		level
+	}
+
+	pub fn input(&mut self, input: Direction) {
 		for move_ in self.data.active_events.moves.iter() {
 			if move_.entity_id == self.player_id {
 				println!("Cannot create a duplicate move!");
@@ -143,10 +236,15 @@ impl Level {
 			_ => true
 		};
 
-		self.data.active_events.moves.push(MoveEntity {
+		let move_ = MoveEntity {
 			is_friction_push,
 			..MoveEntity::new(self.player_id, [entity.x, entity.y], input)
-		});
+		};
+
+		// TODO: Only add an undo state when something actually happens.
+		self.undo_stack.push(self.data.clone());
+
+		self.data.active_events.moves.push(move_);
 	}
 
 	pub fn tile_is_solid(&self, pos: [isize; 2]) -> bool {
@@ -399,11 +497,11 @@ pub struct MoveEntity {
 	is_friction_push: bool,
 	entity_id: u32,
 	from: [isize; 2],
-	direction: Input,
+	direction: Direction,
 }
 
 impl MoveEntity {
-	fn new(entity_id: u32, from: [isize; 2], direction: Input) -> Self {
+	fn new(entity_id: u32, from: [isize; 2], direction: Direction) -> Self {
 		MoveEntity {
 			is_friction_push: false,
 			entity_id,
@@ -411,16 +509,13 @@ impl MoveEntity {
 			direction,
 		}
 	}
-}
 
-impl MoveEntity {
 	pub fn to(&self) -> [isize; 2] {
 		match self.direction {
-			Input::MoveRight => [self.from[0] + 1, self.from[1]    ],
-			Input::MoveUp    => [self.from[0]    , self.from[1] + 1],
-			Input::MoveLeft  => [self.from[0] - 1, self.from[1]    ],
-			Input::MoveDown  => [self.from[0]    , self.from[1] - 1],
-			_ => todo!("Make a direction enum instead of an input enum"),
+			Direction::Right => [self.from[0] + 1, self.from[1]    ],
+			Direction::Up    => [self.from[0]    , self.from[1] + 1],
+			Direction::Left  => [self.from[0] - 1, self.from[1]    ],
+			Direction::Down  => [self.from[0]    , self.from[1] - 1],
 		}
 	}
 }
@@ -460,7 +555,6 @@ impl Entity {
 pub enum EntityKind {
 	Player,
 	Human,
-	Block,
 	Cake,
 }
 
@@ -470,7 +564,6 @@ impl EntityKind {
 			EntityKind::Player => Texture::Player,
 			EntityKind::Human => Texture::Human,
 			EntityKind::Cake => Texture::Cake,
-			EntityKind::Block => Texture::Wall,
 		}
 	}
 }

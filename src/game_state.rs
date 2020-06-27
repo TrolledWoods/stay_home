@@ -40,7 +40,7 @@ pub struct LevelPlayer {
 	current_level: usize,
 	level: Level,
 	level_graphics: LevelGraphics,
-	cached_input: Option<Input>,
+	cached_input: Option<Direction>,
 	hot_load_timer: f32,
 	previous_load: std::time::SystemTime,
 	update_timer: f32,
@@ -76,52 +76,53 @@ impl LevelPlayer {
 	pub fn input(&mut self, graphics: &mut Graphics, input: Input) 
 		-> Result<(), String> 
 	{
-		// @Cleanup: Use a friggin match
-		let mut level_changed = false;
-		if input == Input::PrevLevel {
-			if self.current_level > 0 {
-				self.current_level -= 1;
-			}else {
-				println!("No previous level");
-			}
-			level_changed = true;
-		}
-		if input == Input::Undo {
-			if let Some(data) = self.level.undo_stack.pop() {
-				self.level.data = data;
+		match input {
+			Input::Randomize => {
+				self.level = Level::randomized();
 				self.level_graphics
 					.reset(graphics, &self.level);
-			} else {
-				println!("Nothing to undo");
 			}
-			return Ok(());
-		}
-		if input == Input::NextLevel || 
-			(input == Input::Confirm && self.level.has_won)
-		{
-			if self.current_level < self.levels.len() - 1 {
-				self.current_level += 1;
-			}else {
-				println!("No more levels!");
+			Input::Undo => {
+				if let Some(undo_state) = self.level.undo_stack.pop() {
+					self.level.data = undo_state;
+					self.level_graphics
+						.reset(graphics, &self.level);
+				}else {
+					println!("Nothing to undo!");
+				}
 			}
-			level_changed = true;
-		}
-		if input == Input::Restart || 
-			(input == Input::Confirm && !self.level.has_won) 
-		{
-			level_changed = true;
+			Input::PrevLevel => {
+				if self.current_level > 0 {
+					self.current_level -= 1;
+					self.reload_level(graphics);
+				}else {
+					println!("No previous level");
+				}
+			}
+			Input::Confirm if self.level.has_won => {
+				if self.current_level < self.levels.len() - 1 {
+					self.current_level += 1;
+					self.reload_level(graphics);
+				}else {
+					println!("No more levels!");
+				}
+			}
+			Input::Confirm => {
+				self.reload_level(graphics);
+			}
+			Input::NextLevel => {
+				if self.current_level < self.levels.len() - 1 {
+					self.current_level += 1;
+					self.reload_level(graphics);
+				}else {
+					println!("No more levels!");
+				}
+			}
+			Input::Move(direction) => {
+				self.cached_input = Some(direction);
+			}
 		}
 
-		if level_changed {
-			match self.reload_level(graphics) {
-				Ok(_) => (),
-				Err(err) => println!("Error going to next level: {}", err),
-			}
-
-			return Ok(());
-		}
-
-		self.cached_input = Some(input);
 		Ok(())
 	}
 
@@ -140,6 +141,8 @@ impl LevelPlayer {
 			{
 				if self.previous_load != new_time {
 					self.previous_load = new_time;
+					// @Cleanup: Catch the error here, don't let it fall through!
+					// We don't wanna crash when the levels are invalid
 					let levels = Level::several_from_string(
 						&fs::read_to_string(&self.level_path)
 						.map_err(|v| v.to_string())?
@@ -149,11 +152,7 @@ impl LevelPlayer {
 					}
 					self.levels = levels;
 
-					match self.reload_level(graphics) {
-						Ok(_) => (),
-						Err(msg) => 
-							println!("Cannot reload level because: {}", msg),
-					}
+					self.reload_level(graphics);
 				}
 			} else {
 				println!("Reading file metadata failed");
@@ -187,11 +186,10 @@ impl LevelPlayer {
 		Ok(())
 	}
 
-	fn reload_level(&mut self, graphics: &mut Graphics) -> Result<(), String> {
+	fn reload_level(&mut self, graphics: &mut Graphics) {
 		let level = self.levels[self.current_level].clone();
 		self.level_graphics
 			.reset(graphics, &level);
 		self.level = level;
-		Ok(())
 	}
 }
