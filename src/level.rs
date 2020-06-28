@@ -135,9 +135,10 @@ impl Level {
 		let height = 8;
 		let n_house = 3;
 		let n_sad_house = 2;
-		let n_extra_cake = 1;
-		let n_wall = 10;
-		let n_ice = 10;
+		let n_extra_cake = 4;
+		let n_goops = 3;
+		let n_wall = 7;
+		let n_ice = 5;
 
 		let mut level: Level = Default::default();
 		level.data.width = width;
@@ -206,6 +207,14 @@ impl Level {
 			Entity::new(x, y, EntityKind::Player));
 		level.player_id = level.entity_id_ctr;
 		level.entity_id_ctr += 1;
+
+		for _ in 0..n_goops {
+			let [x, y] = tiles.next().unwrap();
+			level.data.entities.insert(level.entity_id_ctr, 
+				Entity::new(x, y, EntityKind::BucketOfGoop));
+			level.set_tile([x, y], Tile::FloorWithGoop);
+			level.entity_id_ctr += 1;
+		}
 
 		// Cakes
 		for _ in 0..(n_sad_house + n_extra_cake) {

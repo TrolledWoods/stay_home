@@ -187,9 +187,13 @@ impl LevelPlayer {
 	}
 
 	fn reload_level(&mut self, graphics: &mut Graphics) {
-		let level = self.levels[self.current_level].clone();
+		let data = if self.level.undo_stack.len() > 0 {
+			self.level.undo_stack.remove(0)
+		} else {
+			self.level.data.clone()
+		};
+		self.level.data = data;
 		self.level_graphics
-			.reset(graphics, &level);
-		self.level = level;
+			.reset(graphics, &self.level);
 	}
 }
