@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use crate::level::{Tile, Animation};
 use crate::graphics::{TextureVertex, Graphics};
-use crate::textures::Texture as TextureId;
+use crate::textures::{UVCoords, Texture as TextureId};
 use std::collections::{HashMap, VecDeque};
 
 pub struct LevelGraphics {
@@ -329,8 +329,31 @@ fn generate_level_graphics(
 	let mut indices = Vec::new();
 
 	for (i, tile) in level.data.tiles.iter().copied().enumerate() {
-		let x = i % level.data.width;
-		let y = i / level.data.width;
+		let x = (i % level.data.width) as isize;
+		let y = (i / level.data.width) as isize;
+
+		if tile == Tile::Floor {
+			let mut data = [false; 9];
+			for rel_x in 0..=2 {
+				for rel_y in 0..=2 {
+					data[rel_x as usize + rel_y as usize * 3] = 
+						level.get_tile([x + rel_x - 1, y + rel_y - 1])
+						.map(|v| v != Tile::Wall)
+						.unwrap_or(false);
+				}
+			}
+
+			let uv = graphics.textures.get_uv(TextureId::FloorMap);
+			generate_tilemap_tile_graphics(
+				graphics,
+				[x as f32, y as f32, 1.0, 1.0],
+				uv,
+				data,
+				&mut vertices,
+				&mut indices,
+			);
+			continue;
+		}
 
 		let uv = graphics.textures.get_uv(match tile {
 			Tile::Floor => TextureId::Floor,
@@ -342,31 +365,11 @@ fn generate_level_graphics(
 			Tile::FloorWithGoop => TextureId::FloorWithGoop,
 			Tile::IceWithGoop => TextureId::IceWithGoop,
 		});
-		let vert_index = vertices.len() as u32;
-		vertices.push(TextureVertex {
-			position: [x as f32, y as f32, 1.0],
-			uv: [uv.left, uv.bottom],
-		});
-		vertices.push(TextureVertex {
-			position: [x as f32, y as f32 + 1.0, 1.0],
-			uv: [uv.left, uv.top],
-		});
-		vertices.push(TextureVertex {
-			position: [x as f32 + 1.0, y as f32 + 1.0, 1.0],
-			uv: [uv.right, uv.top],
-		});
-		vertices.push(TextureVertex {
-			position: [x as f32 + 1.0, y as f32, 1.0],
-			uv: [uv.right, uv.bottom],
-		});
-
-		indices.push(vert_index);
-		indices.push(vert_index + 1);
-		indices.push(vert_index + 2);
-
-		indices.push(vert_index);
-		indices.push(vert_index + 2);
-		indices.push(vert_index + 3);
+		graphics.push_texture_quad(
+			&mut vertices, &mut indices, 
+			[x as f32, y as f32, 1.0, 1.0], 
+			uv
+		);
 	}
 
 	(
@@ -377,4 +380,76 @@ fn generate_level_graphics(
 			&indices,
 		).unwrap(),
 	)
+}
+
+/// Pass a graphics, a position rectangle, atlas coordinates and the surrounding
+/// info, and generate a valid thing!
+///
+/// The surrounding info is a map like this:
+/// 6 7 9
+/// 3 4 5
+/// 0 1 2
+/// where 4 is the tile being rendered(ignored),
+/// and the other ones are true if they are "set".
+/// What it means for a tile to be "set" is up to the caller.
+fn generate_tilemap_tile_graphics(
+	graphics: &Graphics,
+	pos: [f32; 4],
+	atlas_coords: UVCoords,
+	data: [bool; 9],
+	vertices: &mut Vec<TextureVertex>,
+	indices: &mut Vec<u32>,
+) {
+	let mut add_quad = move |
+		uv: UVCoords,
+		pos: [f32; 4],
+		horizontal: bool,
+		vertical: bool,
+		diagonal: bool,
+	| {
+		let offset = 2.0 *
+			(if horizontal { 4.0 } else { 0.0 } + 
+			 if vertical   { 2.0 } else { 0.0 } +
+			 if diagonal   { 1.0 } else { 0.0 });
+		graphics.push_texture_quad(
+			vertices,
+			indices,
+			pos,
+			uv.relative(offset, 0.0, offset + 1.0, 1.0),
+		);
+	};
+
+	let atlas_coords = atlas_coords.relative(0.0, 0.0, 1.0 / 8.0, 1.0);
+	// Bottom left
+	add_quad(
+		atlas_coords.relative(0.0, 0.0, 0.5, 0.5),
+		[pos[0], pos[1], pos[2] / 2.0, pos[3] / 2.0],
+		data[3],
+		data[1],
+		data[0],
+	);
+	// Bottom right
+	add_quad(
+		atlas_coords.relative(0.5, 0.0, 1.0, 0.5),
+		[pos[0] + pos[2] / 2.0, pos[1], pos[2] / 2.0, pos[3] / 2.0],
+		data[5],
+		data[1],
+		data[2],
+	);
+	// Top right
+	add_quad(
+		atlas_coords.relative(0.5, 0.5, 1.0, 1.0),
+		[pos[0] + pos[2] / 2.0, pos[1] + pos[3] / 2.0, pos[2] / 2.0, pos[3] / 2.0],
+		data[5],
+		data[7],
+		data[8],
+	);
+	// Top left
+	add_quad(
+		atlas_coords.relative(0.0, 0.5, 0.5, 1.0),
+		[pos[0], pos[1] + pos[3] / 2.0, pos[2] / 2.0, pos[3] / 2.0],
+		data[3],
+		data[7],
+		data[6],
+	);
 }

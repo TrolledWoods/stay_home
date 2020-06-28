@@ -19,6 +19,7 @@ pub enum Texture {
 	FloorWithGoop = 12,
 	IceWithGoop = 13,
 	BucketOfGoop = 14,
+	FloorMap = 15,
 }
 
 pub struct Textures {
@@ -49,6 +50,7 @@ impl Textures {
 			"floor_with_goop.png",
 			"ice_with_goop.png",
 			"bucket_of_goop.png",
+			"floor_map.png",
 		];
 
 		let mut images = Vec::with_capacity(IMAGE_PATHS.len());
@@ -106,4 +108,17 @@ pub struct UVCoords {
 	pub right: f32,
 	pub top: f32,
 	pub bottom: f32,
+}
+
+impl UVCoords {
+	pub fn relative(self, left: f32, bottom: f32, right: f32, top: f32) 
+		-> UVCoords 
+	{
+		UVCoords {
+			left: lerp(self.left, self.right, left),
+			bottom: lerp(self.bottom, self.top, bottom),
+			right: lerp(self.left, self.right, right),
+			top: lerp(self.bottom, self.top, top),
+		}
+	}
 }

@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::textures::{Textures, Texture as TextureId};
+use crate::textures::{Textures, Texture as TextureId, UVCoords};
 
 pub struct Graphics {
 	pub world_texture_program: Program,
@@ -77,6 +77,38 @@ impl Graphics {
 		).unwrap();
 	}
 
+	pub fn push_texture_quad(&self, 
+		vertices: &mut Vec<TextureVertex>,
+		indices: &mut Vec<u32>,
+		pos: [f32; 4], 
+		uv: UVCoords,
+	) {
+		let vert_index = vertices.len() as u32;
+		vertices.push(TextureVertex {
+			position: [pos[0] as f32, pos[1] as f32, 1.0],
+			uv: [uv.left, uv.bottom],
+		});
+		vertices.push(TextureVertex {
+			position: [pos[0] as f32, pos[1] as f32 + pos[3], 1.0],
+			uv: [uv.left, uv.top],
+		});
+		vertices.push(TextureVertex {
+			position: [pos[0] as f32 + pos[2], pos[1] as f32 + pos[3], 1.0],
+			uv: [uv.right, uv.top],
+		});
+		vertices.push(TextureVertex {
+			position: [pos[0] as f32 + pos[2], pos[1] as f32, 1.0],
+			uv: [uv.right, uv.bottom],
+		});
+
+		indices.push(vert_index);
+		indices.push(vert_index + 1);
+		indices.push(vert_index + 2);
+
+		indices.push(vert_index);
+		indices.push(vert_index + 2);
+		indices.push(vert_index + 3);
+	}
 }
 
 #[derive(Clone, Copy)]
