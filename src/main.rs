@@ -41,11 +41,6 @@ pub enum Input {
 }
 
 fn main() {
-	// let level = r#"
-	// @$..HH
-	// ...#.$
-	// ...#..
-	// "#;
 	let mut aspect = 1024.0 / 768.0;
     let events_loop = glium::glutin::event_loop::EventLoop::new();
     let wb = glium::glutin::window::WindowBuilder::new()
@@ -104,6 +99,10 @@ fn main() {
 				},
 				..
 			} => {
+				if scancode == 1 {
+					*control_flow = glutin::event_loop::ControlFlow::Exit;
+				}
+
 				if let Some(&keybind) = keybindings.get(&scancode) {
 					if key_state == ElementState::Pressed {
 						state.input(&mut graphics, keybind).unwrap();

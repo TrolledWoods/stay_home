@@ -20,6 +20,9 @@ pub enum Texture {
 	IceWithGoop = 13,
 	BucketOfGoop = 14,
 	FloorMap = 15,
+	GoopMap = 16,
+	IceMap = 17,
+	VoidMap = 18,
 }
 
 pub struct Textures {
@@ -51,6 +54,9 @@ impl Textures {
 			"ice_with_goop.png",
 			"bucket_of_goop.png",
 			"floor_map.png",
+			"goop_map.png",
+			"ice_map.png",
+			"void_map.png",
 		];
 
 		let mut images = Vec::with_capacity(IMAGE_PATHS.len());
@@ -63,7 +69,7 @@ impl Textures {
 			let (width, height) = image.dimensions();
 			let image = 
 				RawImage2d::from_raw_rgba(image.into_raw(), (width, height));
-			total_width += width;
+			total_width += width + 1;
 			total_height = total_height.max(height);
 			images.push(image);
 		}
@@ -86,7 +92,7 @@ impl Textures {
 				right: (x + image.width) as f32 / total_width as f32,
 				bottom: image.height as f32 / total_height as f32,
 			});
-			x += image.width;
+			x += image.width + 1;
 
 			atlas.write(rect, image);
 		}

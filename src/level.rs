@@ -246,7 +246,7 @@ impl Level {
 		let entity = self.data.entities.get(&self.player_id).unwrap();
 
 		let is_friction_push = match self.get_tile([entity.x, entity.y]).unwrap() {
-			Tile::Ice | Tile::IceWithGoop => false,
+			Tile::Ice => false,
 			_ => true
 		};
 
@@ -374,7 +374,7 @@ impl Level {
 					self.get_tile([one_self.x, one_self.y]).unwrap(),
 					self.get_tile([entity.x,   entity.y  ]).unwrap(),
 				) {
-					(_, Tile::Ice) | (_, Tile::IceWithGoop) if !move_.is_friction_push => {
+					(_, Tile::Ice) if !move_.is_friction_push => {
 						// If something isn't based on friction, and the target
 						// is on ice, then transfer the energy, don't push!
 						events.moves.remove(index);
@@ -463,9 +463,9 @@ impl Level {
 					});
 				},
 				Tile::IceWithGoop => {
-					new_events.moves.push(MoveEntity {
-						..MoveEntity::new(move_.entity_id, to, move_.direction)
-					});
+					// new_events.moves.push(MoveEntity {
+					// 	..MoveEntity::new(move_.entity_id, to, move_.direction)
+					// });
 					entity.goopify();
 					animations.push_back(Animation::Goopify { entity_id: move_.entity_id, kind: entity.kind });
 				}

@@ -150,7 +150,16 @@ impl LevelGraphics {
 				camera_transform: camera_matrix,
 				atlas: graphics.textures.atlas.sampled().magnify_filter(uniforms::MagnifySamplerFilter::Nearest),
 			},
-			&Default::default(),
+			&DrawParameters {
+				blend: Blend {
+					color: BlendingFunction::Addition {
+						source: LinearBlendingFactor::One,
+						destination: LinearBlendingFactor::OneMinusSourceAlpha,
+					},
+					..Default::default()
+				},
+				..Default::default()
+			}
 		).unwrap();
 
 		// Animate stuff
@@ -328,22 +337,113 @@ fn generate_level_graphics(
 	let mut vertices = Vec::new();
 	let mut indices = Vec::new();
 
+	for y in -1..=level.data.height as isize {
+		for x in -1..=level.data.width as isize {
+			let tile = level.get_tile([x, y]).unwrap_or(Tile::Wall);
+			
+			if tile == Tile::Wall {
+				let mut data = [false; 9];
+				for rel_x in 0..=2 {
+					for rel_y in 0..=2 {
+						data[rel_x as usize + rel_y as usize * 3] = 
+							level.get_tile([x + rel_x - 1, y + rel_y - 1])
+							.map(|v| v != Tile::Wall)
+							.unwrap_or(false);
+					}
+				}
+				let uv = graphics.textures.get_uv(TextureId::VoidMap);
+				generate_tilemap_tile_graphics(
+					graphics,
+					[x as f32, y as f32, 1.0, 1.0],
+					uv,
+					data,
+					&mut vertices,
+					&mut indices,
+				);
+				continue;
+			}
+
+			if !(tile == Tile::Wall || tile == Tile::Ice || tile == Tile::IceWithGoop) {
+				let mut data = [false; 9];
+				for rel_x in 0..=2 {
+					for rel_y in 0..=2 {
+						data[rel_x as usize + rel_y as usize * 3] = 
+							level.get_tile([x + rel_x - 1, y + rel_y - 1])
+							.map(|v| v != Tile::HappyHome && v != Tile::Wall && v != Tile::Ice && v != Tile::IceWithGoop)
+							.unwrap_or(false);
+					}
+				}
+
+				let uv = graphics.textures.get_uv(TextureId::FloorMap);
+				generate_tilemap_tile_graphics(
+					graphics,
+					[x as f32, y as f32, 1.0, 1.0],
+					uv,
+					data,
+					&mut vertices,
+					&mut indices,
+				);
+
+				let uv = match tile {
+					Tile::Floor => None,
+					Tile::Ice => unreachable!(),
+					Tile::Home => Some(TextureId::Home),
+					Tile::Wall => Some(TextureId::Wall),
+					Tile::HappyHome => Some(TextureId::HappyHome),
+					Tile::SadHome => Some(TextureId::SadHome),
+					Tile::Ice => Some(TextureId::Ice),
+					Tile::FloorWithGoop => None,
+					Tile::IceWithGoop => unreachable!(),
+				}.map(|v| graphics.textures.get_uv(v));
+
+				if let Some(uv) = uv {
+					graphics.push_texture_quad(
+						&mut vertices,
+						&mut indices,
+						[x as f32, y as f32, 1.0, 1.0],
+						uv
+					);
+				}
+				continue;
+			} else if tile == Tile::Ice || tile == Tile::IceWithGoop {
+				let mut data = [false; 9];
+				for rel_x in 0..=2 {
+					for rel_y in 0..=2 {
+						data[rel_x as usize + rel_y as usize * 3] = 
+							level.get_tile([x + rel_x - 1, y + rel_y - 1])
+							.map(|v| v == Tile::Ice || v == Tile::IceWithGoop)
+							.unwrap_or(false);
+					}
+				}
+
+				let uv = graphics.textures.get_uv(TextureId::IceMap);
+				generate_tilemap_tile_graphics(
+					graphics,
+					[x as f32, y as f32, 1.0, 1.0],
+					uv,
+					data,
+					&mut vertices,
+					&mut indices,
+				);
+			}
+		}
+	}
+
 	for (i, tile) in level.data.tiles.iter().copied().enumerate() {
 		let x = (i % level.data.width) as isize;
 		let y = (i / level.data.width) as isize;
-
-		if tile == Tile::Floor {
+		if tile == Tile::IceWithGoop || tile == Tile::FloorWithGoop {
 			let mut data = [false; 9];
 			for rel_x in 0..=2 {
 				for rel_y in 0..=2 {
 					data[rel_x as usize + rel_y as usize * 3] = 
 						level.get_tile([x + rel_x - 1, y + rel_y - 1])
-						.map(|v| v != Tile::Wall)
+						.map(|v| v == Tile::IceWithGoop || v == Tile::FloorWithGoop)
 						.unwrap_or(false);
 				}
 			}
 
-			let uv = graphics.textures.get_uv(TextureId::FloorMap);
+			let uv = graphics.textures.get_uv(TextureId::GoopMap);
 			generate_tilemap_tile_graphics(
 				graphics,
 				[x as f32, y as f32, 1.0, 1.0],
@@ -352,24 +452,7 @@ fn generate_level_graphics(
 				&mut vertices,
 				&mut indices,
 			);
-			continue;
 		}
-
-		let uv = graphics.textures.get_uv(match tile {
-			Tile::Floor => TextureId::Floor,
-			Tile::Home => TextureId::Home,
-			Tile::Wall => TextureId::Wall,
-			Tile::HappyHome => TextureId::HappyHome,
-			Tile::SadHome => TextureId::SadHome,
-			Tile::Ice => TextureId::Ice,
-			Tile::FloorWithGoop => TextureId::FloorWithGoop,
-			Tile::IceWithGoop => TextureId::IceWithGoop,
-		});
-		graphics.push_texture_quad(
-			&mut vertices, &mut indices, 
-			[x as f32, y as f32, 1.0, 1.0], 
-			uv
-		);
 	}
 
 	(

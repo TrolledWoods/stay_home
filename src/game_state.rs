@@ -160,7 +160,19 @@ impl LevelPlayer {
 		}
 
 		self.update_timer -= dt * 7.0;
+
+		surface.clear_color(0.3, 0.3, 0.5, 1.0);
+		self.level_graphics.render_level(
+			&graphics, 
+			surface, 
+			aspect, 
+			&mut self.level, 
+			0.0f32.max(1.0 - self.update_timer),
+			dt,
+		);
+
 		if self.update_timer <= 0.0 {
+
 			self.level_graphics.animations.clear();
 
 			if let Some(input) = self.cached_input.take() {
@@ -173,15 +185,6 @@ impl LevelPlayer {
 			}
 		}
 
-		surface.clear_color(0.3, 0.3, 0.5, 1.0);
-		self.level_graphics.render_level(
-			&graphics, 
-			surface, 
-			aspect, 
-			&mut self.level, 
-			1.0f32.min(1.0 - self.update_timer),
-			dt,
-		);
 
 		Ok(())
 	}

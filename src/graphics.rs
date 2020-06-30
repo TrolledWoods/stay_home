@@ -120,7 +120,7 @@ pub struct TextureVertex {
 implement_vertex!(TextureVertex, position, uv);
 
 const TEXTURE_VERTEX_SHADER: &str = r##"
-#version 150
+#version 130
 
 uniform mat3 model_transform;
 uniform mat3 camera_transform;
@@ -136,7 +136,7 @@ void main() {
 "##;
 
 const TEXTURE_FRAGMENT_SHADER: &str = r##"
-#version 150
+#version 130
 
 uniform sampler2D atlas;
 
