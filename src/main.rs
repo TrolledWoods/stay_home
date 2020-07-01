@@ -51,7 +51,6 @@ fn main() {
     let display = glium::Display::new(wb, cb, &events_loop).unwrap();
 
 	let sounds = sounds::Sounds::load().unwrap();
-	sounds.play(sounds::SoundId::Music, 0.1);
 
 	let mut keybindings = HashMap::new();
 	keybindings.insert(72, Input::Move(Direction::Up));
@@ -64,7 +63,7 @@ fn main() {
 	keybindings.insert(63, Input::NextLevel);
 	keybindings.insert(59, Input::Randomize);
 
-	let mut graphics = graphics::Graphics::new(&display);
+	let mut graphics = graphics::Graphics::new(&display, sounds);
 
 	let mut state = game_state::GameState::PlayingLevel(
 		game_state::LevelPlayer::new(

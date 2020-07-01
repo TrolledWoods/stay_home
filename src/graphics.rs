@@ -1,14 +1,16 @@
 use crate::prelude::*;
 use crate::textures::{Textures, Texture as TextureId, UVCoords};
+use crate::sounds::Sounds;
 
 pub struct Graphics {
 	pub world_texture_program: Program,
 	pub textures: Textures,
+	pub sounds: Sounds,
 	pub display: Display,
 }
 
 impl Graphics {
-	pub fn new(display: &Display) -> Self {
+	pub fn new(display: &Display, sounds: Sounds) -> Self {
 		println!("Compiling shaders...");
 		let world_texture_program = Program::from_source(display, TEXTURE_VERTEX_SHADER, TEXTURE_FRAGMENT_SHADER, None).unwrap();
 
@@ -16,6 +18,7 @@ impl Graphics {
 		let textures = Textures::load("assets/", &display).unwrap();
 
 		Graphics {
+			sounds,
 			world_texture_program,
 			textures,
 			display: display.clone(),

@@ -181,10 +181,9 @@ impl LevelPlayer {
 
 			if !self.level.data.active_events.empty() {
 				self.update_timer = 1.0;
-				self.level.update(&mut self.level_graphics.animations);
+				self.level.update(&mut self.level_graphics.animations, &graphics.sounds);
 			}
 		}
-
 
 		Ok(())
 	}

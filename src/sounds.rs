@@ -6,7 +6,8 @@ enum SoundMessage {
 }
 
 pub enum SoundId {
-	Music = 0,
+	Push = 0,
+	SpiderWalk = 1,
 }
 
 #[derive(Clone)]
@@ -22,9 +23,10 @@ impl Sounds {
 	pub fn load() -> Result<Sounds, String> {
 		let mut files = Vec::new();
 		for sound_path in &[
-			"assets/music.wav",
+			"assets/push.mp3",
+			"assets/spider_walk.mp3",
 		] {
-			let file = fs::File::open("assets/music.wav").unwrap();
+			let file = fs::File::open(sound_path).unwrap();
 			files.push(
 				&*Box::leak(
 					fs::read(sound_path)

@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use crate::textures::Texture;
 use std::collections::{HashMap, HashSet, VecDeque};
+use crate::sounds::{SoundId, Sounds};
 
 #[derive(Clone, Default)]
 pub struct Level {
@@ -11,7 +12,6 @@ pub struct Level {
 	entity_id_ctr: u32,
 
 	pub has_won: bool,
-
 	pub data: LevelData,
 
 	pub undo_stack: Vec<LevelData>,
@@ -28,6 +28,7 @@ pub struct LevelData {
 	pub height: usize,
 	pub tiles: Vec<Tile>,
 	pub n_humans: usize,
+	pub has_input: bool,
 }
 
 impl Level {
@@ -243,6 +244,8 @@ impl Level {
 			}
 		}
 
+		self.data.has_input = true;
+
 		let entity = self.data.entities.get(&self.player_id).unwrap();
 
 		let is_friction_push = match self.get_tile([entity.x, entity.y]).unwrap() {
@@ -313,7 +316,7 @@ impl Level {
 		true
 	}
 
-	pub fn update(&mut self, animations: &mut VecDeque<Animation>) {
+	pub fn update(&mut self, animations: &mut VecDeque<Animation>, sounds: &Sounds) {
 		let mut events = std::mem::replace(
 			&mut self.data.active_events, 
 			self.old_events.take().unwrap_or_else(|| Events::new()),
@@ -322,6 +325,7 @@ impl Level {
 
 		// Pushing things
 		let mut index = 0;
+		let mut pushing_happened = false;
 		'outer: while index < events.moves.len() {
 			let move_ = events.moves[index];
 			let to = move_.to();
@@ -404,6 +408,7 @@ impl Level {
 						};
 						events.moves.push(move_);
 						index += 1;
+						pushing_happened = true;
 					}
 				};
 
@@ -411,6 +416,10 @@ impl Level {
 				// No pushing!
 				index += 1;
 			}
+		}
+
+		if pushing_happened {
+			sounds.play(SoundId::Push, 0.1);
 		}
 
 		// TODO: Resolve move conflicts
@@ -528,6 +537,11 @@ impl Level {
 
 		for entity in entities_to_remove {
 			self.data.entities.remove(&entity);
+		}
+
+		if self.data.has_input {
+			sounds.play(SoundId::SpiderWalk, 0.1);
+			self.data.has_input = false;
 		}
 
 		self.data.active_events = new_events;
