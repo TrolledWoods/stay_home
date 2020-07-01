@@ -26,7 +26,6 @@ impl Sounds {
 			"assets/push.mp3",
 			"assets/spider_walk.mp3",
 		] {
-			let file = fs::File::open(sound_path).unwrap();
 			files.push(
 				&*Box::leak(
 					fs::read(sound_path)
@@ -44,8 +43,6 @@ impl Sounds {
 		// I don't have to figure out the type of the vector!
 		let (sound_transmit, sound_recieve) = mpsc::channel();
 		std::thread::spawn(move || {
-			use std::fs::File;
-			use std::io::BufReader;
 			use rodio::Source;
 
 			let device = match rodio::default_output_device() {
@@ -81,7 +78,7 @@ impl Sounds {
 	pub fn play(&self, sound: SoundId, volume: f32) {
 		match self.channel.send(SoundMessage::Play(sound, volume)) {
 			Ok(()) => (),
-			Err(val) => {
+			Err(_) => {
 				println!("Something went wrong with the sound, no more sounds \
 					can play!");
 			}

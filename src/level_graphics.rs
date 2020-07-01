@@ -391,7 +391,6 @@ fn generate_level_graphics(
 					Tile::Wall => Some(TextureId::Wall),
 					Tile::HappyHome => Some(TextureId::HappyHome),
 					Tile::SadHome => Some(TextureId::SadHome),
-					Tile::Ice => Some(TextureId::Ice),
 					Tile::FloorWithGoop => None,
 					Tile::IceWithGoop => unreachable!(),
 				}.map(|v| graphics.textures.get_uv(v));

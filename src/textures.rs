@@ -1,28 +1,36 @@
 use crate::prelude::*;
 use std::path::Path;
 
-#[derive(Clone, Copy)]
-#[repr(usize)]
-pub enum Texture {
-	Wall = 0,
-	Floor = 1,
-	Home = 2,
-	Human = 3,
-	VictoryText = 4,
-	HappyHome = 5,
-	Cake = 6,
-	SadHome = 7,
-	Player = 8,
-	Ice = 9,
-	HumanWithGoop = 10,
-	CakeWithGoop = 11,
-	FloorWithGoop = 12,
-	IceWithGoop = 13,
-	BucketOfGoop = 14,
-	FloorMap = 15,
-	GoopMap = 16,
-	IceMap = 17,
-	VoidMap = 18,
+macro_rules! make_textures {
+	($($name:ident: $path:expr),*,) => {
+		#[derive(Clone, Copy)]
+		#[repr(usize)]
+		pub enum Texture {
+			$($name),*
+		}
+
+		const TEXTURE_PATHS: &[&str] = &[
+			$($path),*
+		];
+	}
+}
+
+make_textures! {
+	Wall: "wall.png",
+	Home: "home.png",
+	Human: "human.png",
+	VictoryText: "victory_text.png",
+	HappyHome: "happy_home.png",
+	Cake: "cake.png",
+	SadHome: "sad_home.png",
+	Player: "player.png",
+	HumanWithGoop: "human_with_goop.png",
+	CakeWithGoop: "cake_with_goop.png",
+	BucketOfGoop: "bucket_of_goop.png",
+	FloorMap: "floor_map.png",
+	GoopMap: "goop_map.png",
+	IceMap: "ice_map.png",
+	VoidMap: "void_map.png",
 }
 
 pub struct Textures {
@@ -37,30 +45,8 @@ impl Textures {
 		let mut total_width = 0;
 		let mut total_height = 0;
 
-		const IMAGE_PATHS: &[&str] = &[
-			"wall.png",
-			"floor.png",
-			"home.png",
-			"human.png",
-			"victory_text.png",
-			"happy_home.png",
-			"cake.png",
-			"sad_home.png",
-			"player.png",
-			"ice.png",
-			"human_with_goop.png",
-			"cake_with_goop.png",
-			"floor_with_goop.png",
-			"ice_with_goop.png",
-			"bucket_of_goop.png",
-			"floor_map.png",
-			"goop_map.png",
-			"ice_map.png",
-			"void_map.png",
-		];
-
-		let mut images = Vec::with_capacity(IMAGE_PATHS.len());
-		for image_path in IMAGE_PATHS {
+		let mut images = Vec::with_capacity(TEXTURE_PATHS.len());
+		for image_path in TEXTURE_PATHS {
 			println!("Loading texture '{}'", image_path);
 			let image = image::open(&folder.as_ref().join(image_path))
 				.map_err(|_| 

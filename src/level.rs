@@ -316,6 +316,10 @@ impl Level {
 		true
 	}
 
+	// @Cleanup: Remove the Sounds import here, and instead cycle through the 
+	// animations and apply sounds that way.
+	// @Cleanup: Make undo only save states where you move and push 
+	// something/slide on ice.
 	pub fn update(&mut self, animations: &mut VecDeque<Animation>, sounds: &Sounds) {
 		let mut events = std::mem::replace(
 			&mut self.data.active_events, 
