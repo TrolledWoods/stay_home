@@ -159,7 +159,7 @@ impl LevelPlayer {
 			}
 		}
 
-		self.update_timer -= dt * 5.0;
+		self.update_timer -= dt * 6.0;
 
 		surface.clear_color(0.3, 0.3, 0.5, 1.0);
 		self.level_graphics.render_level(
