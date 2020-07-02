@@ -48,7 +48,7 @@ impl LevelGraphics {
 			).unwrap();
 
 			entities.insert(*id, EntityGraphics {
-				position: [entity.x as f32, entity.y as f32],
+				position: [entity.pos[0] as f32, entity.pos[1] as f32],
 				size: 1.0,
 				vertex_buffer: vertices,
 				index_buffer: indices,
@@ -96,7 +96,7 @@ impl LevelGraphics {
 			).unwrap();
 
 			self.entities.insert(*id, EntityGraphics {
-				position: [entity.x as f32, entity.y as f32],
+				position: [entity.pos[0] as f32, entity.pos[1] as f32],
 				size: 1.0,
 				vertex_buffer: vertices,
 				index_buffer: indices,
@@ -115,10 +115,10 @@ impl LevelGraphics {
 		time: f32,
 		dt: f32,
 	) {
-		let size = if (level.data.height as f32) > (level.data.width as f32 / aspect) {
-			1.0 / level.data.height as f32
+		let size = if (level.height() as f32) > (level.width() as f32 / aspect) {
+			1.0 / level.height() as f32
 		} else {
-			aspect / level.data.width as f32
+			aspect / level.width() as f32
 		};
 		let camera_matrix = [
 			[1.5 * size / aspect, 0.0, 0.0f32],
@@ -129,7 +129,7 @@ impl LevelGraphics {
 		let model_transform = [
 			[1.0, 0.0, 0.0f32],
 			[0.0, 1.0, 0.0f32],
-			[-(level.data.width as f32) / 2.0, -(level.data.height as f32) / 2.0, 1.0f32],
+			[-(level.width() as f32) / 2.0, -(level.height() as f32) / 2.0, 1.0f32],
 		];
 
 		// If the tilemap has changed, change the graphics too!
@@ -334,9 +334,9 @@ fn generate_level_graphics(
 	let mut vertices = Vec::new();
 	let mut indices = Vec::new();
 
-	for y in -1..=level.data.height as isize {
-		for x in -1..=level.data.width as isize {
-			let tile = level.get_tile([x, y])
+	for y in -1..=level.height() as isize {
+		for x in -1..=level.width() as isize {
+			let tile = level.data.tiles.get_tile([x, y])
 				.unwrap_or(Tile::Wall(WallKind::Void));
 			let tile_graphics = tile.graphics();
 
@@ -352,32 +352,6 @@ fn generate_level_graphics(
 					&mut indices,
 				);
 			}
-		}
-	}
-
-	for (i, tile) in level.data.tiles.iter().copied().enumerate() {
-		let x = (i % level.data.width) as isize;
-		let y = (i / level.data.width) as isize;
-		if tile == Tile::IceWithGoop || tile == Tile::FloorWithGoop {
-			let mut data = [false; 9];
-			for rel_x in 0..=2 {
-				for rel_y in 0..=2 {
-					data[rel_x as usize + rel_y as usize * 3] = 
-						level.get_tile([x + rel_x - 1, y + rel_y - 1])
-						.map(|v| v == Tile::IceWithGoop || v == Tile::FloorWithGoop)
-						.unwrap_or(false);
-				}
-			}
-
-			let uv = graphics.textures.get_uv(TextureId::GoopMap);
-			generate_tilemap_tile_graphics(
-				graphics,
-				[x as f32, y as f32, 1.0, 1.0],
-				uv,
-				data,
-				&mut vertices,
-				&mut indices,
-			);
 		}
 	}
 
@@ -430,7 +404,7 @@ fn generate_tile_graphics(
 			for rel_x in 0..=2 {
 				for rel_y in 0..=2 {
 					data[rel_x as usize + rel_y as usize * 3] = 
-						level.get_tile([x + rel_x - 1, y + rel_y - 1])
+						level.data.tiles.get_tile([x + rel_x - 1, y + rel_y - 1])
 						.map(connects_to_tile)
 						.unwrap_or(false);
 				}

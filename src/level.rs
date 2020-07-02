@@ -24,13 +24,7 @@ pub struct Level {
 pub struct LevelData {
 	pub entities: HashMap<u32, Entity>,
 	pub active_events: Events,
-
-	// @Cleanup: Put this into a tilemap struct,
-	// and make some accessor functions for the width/height on the
-	// Level, and the LevelData
-	pub width: usize,
-	pub height: usize,
-	pub tiles: Vec<Tile>,
+	pub tiles: Tilemap,
 	pub n_humans: usize,
 	pub has_input: bool,
 }
@@ -70,16 +64,16 @@ impl Level {
 
 			making_level = true;
 
-			if level.data.width == 0 { 
-				level.data.width = line.len(); 
-			}else if level.data.width != line.len() { 
+			if level.width() == 0 { 
+				level.data.tiles.width = line.len(); 
+			}else if level.width() != line.len() { 
 				return Err(format!("Expected the same width for every line")); 
 			}
 
-			level.data.height += 1;
+			level.data.tiles.height += 1;
 
 			for (x, char_) in line.chars().enumerate() {
-				level.data.tiles.push(match char_ {
+				level.data.tiles.buffer.push(match char_ {
 					// Entities
 					'p' | 'P' => {
 						if has_player {
@@ -146,33 +140,42 @@ impl Level {
 		let n_ice = 5;
 
 		let mut level: Level = Default::default();
-		level.data.width = width;
-		level.data.height = height;
-		level.data.tiles = vec![
-			Tile::Floor; 
-			level.data.width * level.data.height
-		];
+		level.data.tiles.width = width;
+		level.data.tiles.height = height;
+		level.data.tiles.buffer = vec![Tile::Floor; width * height];
 
 		let mut tiles = HashSet::new();
-		for x in 0..level.data.width {
-			for y in 0..level.data.height {
+		for x in 0..width {
+			for y in 0..height {
 				tiles.insert([x as isize, y as isize]);
 			}
 		}
 		let mut tiles = tiles.drain();
 
 		for _ in 0..n_wall {
-			level.set_tile(tiles.next().unwrap(), Tile::Wall(WallKind::Void));
+			level.data.tiles.set_tile(
+				tiles.next().unwrap(), 
+				Tile::Wall(WallKind::Void),
+			);
 		}
 
 		for _ in 0..n_ice {
-			level.set_tile(tiles.next().unwrap(), Tile::Ice);
+			level.data.tiles.set_tile(
+				tiles.next().unwrap(),
+				Tile::Ice,
+			);
 		}
 		for _ in 0..n_house {
-			level.set_tile(tiles.next().unwrap(), Tile::Home);
+			level.data.tiles.set_tile(
+				tiles.next().unwrap(),
+				Tile::Home,
+			);
 		}
 		for _ in 0..n_sad_house {
-			level.set_tile(tiles.next().unwrap(), Tile::SadHome);
+			level.data.tiles.set_tile(
+				tiles.next().unwrap(),
+				Tile::SadHome,
+			);
 		}
 
 		let old_tiles = tiles;
@@ -217,7 +220,7 @@ impl Level {
 			let [x, y] = tiles.next().unwrap();
 			level.data.entities.insert(level.entity_id_ctr, 
 				Entity::new(x, y, EntityKind::BucketOfGoop));
-			level.set_tile([x, y], Tile::FloorWithGoop);
+			level.data.tiles.set_tile([x, y], Tile::FloorWithGoop);
 			level.entity_id_ctr += 1;
 		}
 
@@ -241,6 +244,16 @@ impl Level {
 		level
 	}
 
+	#[inline]
+	pub fn width(&self) -> usize {
+		self.data.tiles.width
+	}
+
+	#[inline]
+	pub fn height(&self) -> usize {
+		self.data.tiles.height
+	}
+
 	pub fn input(&mut self, input: Direction) {
 		for move_ in self.data.active_events.moves.iter() {
 			if move_.entity_id == self.player_id {
@@ -252,14 +265,15 @@ impl Level {
 
 		let entity = self.data.entities.get(&self.player_id).unwrap();
 
-		let is_friction_push = match self.get_tile([entity.x, entity.y]).unwrap() {
-			Tile::Ice => false,
-			_ => true
-		};
+		let is_friction_push = 
+			match self.data.tiles.get_tile(entity.pos).unwrap() {
+				Tile::Ice => false,
+				_ => true
+			};
 
 		let move_ = MoveEntity {
 			is_friction_push,
-			..MoveEntity::new(self.player_id, [entity.x, entity.y], input)
+			..MoveEntity::new(self.player_id, entity.pos, input)
 		};
 
 		// TODO: Only add an undo state when something actually happens.
@@ -269,19 +283,19 @@ impl Level {
 	}
 
 	pub fn tile_is_solid(&self, pos: [isize; 2]) -> bool {
-		if pos[0] < 0 || pos[0] as usize >= self.data.width || 
-			pos[1] < 0 || pos[1] as usize >= self.data.height 
+		if pos[0] < 0 || pos[0] as usize >= self.width() || 
+			pos[1] < 0 || pos[1] as usize >= self.height()
 		{
 			return true;
 		}
 
-		match self.get_tile(pos).unwrap() {
+		match self.data.tiles.get_tile(pos).unwrap() {
 			Tile::Wall(_) => return true,
 			_ => (),
 		}
 
 		for entity in self.data.entities.values() {
-			if entity.x == pos[0] && entity.y == pos[1] {
+			if entity.pos == pos {
 				return true;
 			}
 		}
@@ -291,33 +305,11 @@ impl Level {
 
 	fn get_entity_at_tile(&self, pos: [isize; 2]) -> Option<u32> {
 		for (&id, entity) in self.data.entities.iter() {
-			if entity.x == pos[0] && entity.y == pos[1] {
+			if entity.pos == pos {
 				return Some(id);
 			}
 		}
 		None
-	}
-
-	pub fn get_tile(&self, pos: [isize; 2]) -> Option<Tile> {
-		if pos[0] < 0 || pos[0] as usize >= self.data.width 
-			|| pos[1] < 0 || pos[1] as usize >= self.data.height {
-			return None;
-		}
-
-		// @Cleanup: get_unchecked?? Don't feel like doing unsafe for now.
-		Some(self.data.tiles[pos[0] as usize + pos[1] as usize * self.data.width])
-	}
-
-	pub fn set_tile(&mut self, pos: [isize; 2], tile: Tile) -> bool {
-		if pos[0] < 0 || pos[0] as usize >= self.data.width 
-			|| pos[1] < 0 || pos[1] as usize >= self.data.height {
-			return false;
-		}
-
-		// @Cleanup: get_unchecked?? Don't feel like doing unsafe for now.
-		self.data.tiles[pos[0] as usize + pos[1] as usize * self.data.width] 
-			= tile;
-		true
 	}
 
 	// @Cleanup: Remove the Sounds import here, and instead cycle through the 
@@ -367,9 +359,9 @@ impl Level {
 					// The goop child eats the cake!
 					let other = self.data.entities.get_mut(&id).unwrap();
 					other.kind = EntityKind::Human;
-					let other_pos = [other.x, other.y];
+					let other_pos = other.pos;
 					let me = self.data.entities.get_mut(&move_.entity_id).unwrap();
-					let me_pos = [me.x, me.y];
+					let me_pos = me.pos;
 					animations.push_back(Animation::Move {
 						from: me_pos,
 						to: other_pos,
@@ -385,8 +377,8 @@ impl Level {
 				}
 				
 				match (
-					self.get_tile([one_self.x, one_self.y]).unwrap(),
-					self.get_tile([entity.x,   entity.y  ]).unwrap(),
+					self.data.tiles.get_tile(one_self.pos).unwrap(),
+					self.data.tiles.get_tile(entity.pos).unwrap(),
 				) {
 					(_, Tile::Ice) if !move_.is_friction_push => {
 						// If something isn't based on friction, and the target
@@ -395,15 +387,15 @@ impl Level {
 
 						animations.push_back(Animation::Move {
 							entity_id: move_.entity_id,
-							from: [one_self.x, one_self.y],
-							to:   [entity.x,   entity.y  ],
+							from: one_self.pos,
+							to:   entity.pos,
 							accelerate: !one_self.is_sliding,
 							decelerate: true,
 							kind: AnimationMoveKind::IceKick,
 						});
 						let move_ = MoveEntity::new(
 							id,
-							[entity.x, entity.y],
+							entity.pos,
 							move_.direction,
 						);
 						events.moves.push(move_);
@@ -412,7 +404,7 @@ impl Level {
 						// Just normal pushing
 						let move_ = MoveEntity {
 							is_friction_push: true,
-							..MoveEntity::new(id, [entity.x, entity.y], move_.direction)
+							..MoveEntity::new(id, entity.pos, move_.direction)
 						};
 						events.moves.push(move_);
 						index += 1;
@@ -452,13 +444,13 @@ impl Level {
 
 			let entity = self.data.entities.get(&move_.entity_id).unwrap();
 			if entity.kind == EntityKind::BucketOfGoop {
-				match self.get_tile(move_.to()).unwrap() {
+				match self.data.tiles.get_tile(move_.to()).unwrap() {
 					Tile::Ice => {
-						self.set_tile(move_.to(), Tile::IceWithGoop);
+						self.data.tiles.set_tile(move_.to(), Tile::IceWithGoop);
 						self.n_tile_changes += 1;
 					}
 					Tile::Floor => {
-						self.set_tile(move_.to(), Tile::FloorWithGoop);
+						self.data.tiles.set_tile(move_.to(), Tile::FloorWithGoop);
 						self.n_tile_changes += 1;
 					}
 					Tile::Home | Tile::SadHome => {
@@ -476,7 +468,7 @@ impl Level {
 			}
 
 			let entity = self.data.entities.get_mut(&move_.entity_id).unwrap();
-			match self.data.tiles[to[0] as usize + to[1] as usize * self.data.width] {
+			match self.data.tiles.get_tile(to).unwrap() {
 				Tile::Ice => {
 					new_events.moves.push(MoveEntity {
 						..MoveEntity::new(move_.entity_id, to, move_.direction)
@@ -496,11 +488,10 @@ impl Level {
 				_ => (),
 			}
 
-			entity.x = to[0];
-			entity.y = to[1];
+			entity.pos = to;
 
 			let mut moving_to_ice = false;
-			if self.data.tiles[to[0] as usize + to[1] as usize * self.data.width] == Tile::Ice {
+			if self.data.tiles.get_tile(to) == Some(Tile::Ice) {
 				moving_to_ice = true;
 			}
 
@@ -519,9 +510,12 @@ impl Level {
 		let mut entities_to_remove = Vec::new();
 		for (&entity_id, entity) in self.data.entities.iter() {
 			let mut modified_tile = false;
-			match (entity.kind, self.data.tiles[entity.x as usize + entity.y as usize * self.data.width]) {
+			match (entity.kind, self.data.tiles.get_tile(entity.pos).unwrap()) {
 				(EntityKind::Human, Tile::Home) => {
-					self.data.tiles[entity.x as usize + entity.y as usize * self.data.width] = Tile::Wall(WallKind::HappyHome);
+					self.data.tiles.set_tile(
+						entity.pos, 
+						Tile::Wall(WallKind::HappyHome),
+					);
 					self.data.n_humans -= 1;
 					if self.data.n_humans == 0 {
 						self.has_won = true;
@@ -529,7 +523,7 @@ impl Level {
 					modified_tile = true;
 				}
 				(EntityKind::Cake, Tile::SadHome) => {
-					self.data.tiles[entity.x as usize + entity.y as usize * self.data.width] = Tile::Home;
+					self.data.tiles.set_tile(entity.pos, Tile::Home);
 					modified_tile = true;
 				}
 				_ => (),
@@ -538,8 +532,8 @@ impl Level {
 			if modified_tile {
 				self.n_tile_changes += 1;
 
-				let mut from = [entity.x, entity.y];
-				let to = [entity.x, entity.y];
+				let mut from = entity.pos;
+				let to = entity.pos;
 				let mut accelerate = false;
 				for (i, animation) in animations.iter().enumerate() {
 					if let Animation::Move { 
@@ -581,6 +575,50 @@ impl Level {
 
 		self.data.active_events = new_events;
 		self.old_events = Some(events);
+	}
+}
+
+#[derive(Clone, Default)]
+pub struct Tilemap {
+	pub width: usize,
+	pub height: usize,
+	pub buffer: Vec<Tile>,
+}
+
+impl Tilemap {
+	pub fn get_tile(&self, pos: [isize; 2]) -> Option<Tile> {
+		debug_assert_eq!(self.buffer.len(), self.width * self.height);
+		if pos[0] < 0 || pos[0] as usize >= self.width 
+			|| pos[1] < 0 || pos[1] as usize >= self.height {
+			return None;
+		}
+
+		// SAFETY: The bounds check is up above
+		unsafe {
+			Some(*self.buffer.get_unchecked(
+				pos[0] as usize + pos[1] as usize * self.width
+			))
+		}
+	}
+
+	/// Sets a tile
+	///
+	/// # Panics
+	/// If the tile is out of bounds.
+	pub fn set_tile(&mut self, pos: [isize; 2], tile: Tile) {
+		debug_assert_eq!(self.buffer.len(), self.width * self.height);
+
+		if pos[0] < 0 || pos[0] as usize >= self.width 
+			|| pos[1] < 0 || pos[1] as usize >= self.height {
+			panic!("Tried setting a tile out of bounds!");
+		}
+
+		// SAFETY: The bounds check is up above
+		unsafe {
+			*self.buffer.get_unchecked_mut(
+				pos[0] as usize + pos[1] as usize * self.width 
+			) = tile;
+		}
 	}
 }
 
@@ -748,16 +786,14 @@ pub enum TileGraphics {
 
 #[derive(Clone, Copy)]
 pub struct Entity {
-	// @Cleanup: Coordinates with an array
-	pub x: isize,
-	pub y: isize,
+	pub pos: [isize; 2],
 	pub kind: EntityKind,
 	pub is_sliding: bool,
 }
 
 impl Entity {
 	pub fn new(x: isize, y: isize, kind: EntityKind) -> Self {
-		Entity { x, y, kind, is_sliding: false, }
+		Entity { pos: [x, y], kind, is_sliding: false, }
 	}
 
 	pub fn goopify(&mut self) {
