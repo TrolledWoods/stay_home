@@ -79,7 +79,7 @@ fn main() {
 			/ 1_000_000.0;
 		previous_frame = current_frame;
 
-		*control_flow = glutin::event_loop::ControlFlow::WaitUntil(current_frame + std::time::Duration::from_millis(5));
+		*control_flow = glutin::event_loop::ControlFlow::WaitUntil(current_frame + std::time::Duration::from_millis(15));
 
 		use glutin::event::{Event, WindowEvent};
 		match event {
@@ -114,7 +114,11 @@ fn main() {
 					println!("Unknown key scancode: '{}'", scancode);
 				}
 			}
-			_ => (),
+			Event::MainEventsCleared => (),
+			Event::RedrawEventsCleared => (),
+			Event::NewEvents(_) => (),
+			_unknown_event => (), 
+			// println!("Unknown event; {:?}", unknown_event),
 		}
 
 		let mut frame = display.draw();
