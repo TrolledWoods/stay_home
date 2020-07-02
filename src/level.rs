@@ -24,6 +24,10 @@ pub struct Level {
 pub struct LevelData {
 	pub entities: HashMap<u32, Entity>,
 	pub active_events: Events,
+
+	// @Cleanup: Put this into a tilemap struct,
+	// and make some accessor functions for the width/height on the
+	// Level, and the LevelData
 	pub width: usize,
 	pub height: usize,
 	pub tiles: Vec<Tile>,
@@ -111,7 +115,7 @@ impl Level {
 						if char_.is_uppercase() { Tile::Ice } else { Tile::Floor }
 					}
 					'.' => Tile::Floor,
-					'#' => Tile::Wall,
+					'#' => Tile::Wall(WallKind::Void),
 					'H' => Tile::Home,
 					'S' => Tile::SadHome,
 					'%' => Tile::Ice,
@@ -158,7 +162,7 @@ impl Level {
 		let mut tiles = tiles.drain();
 
 		for _ in 0..n_wall {
-			level.set_tile(tiles.next().unwrap(), Tile::Wall);
+			level.set_tile(tiles.next().unwrap(), Tile::Wall(WallKind::Void));
 		}
 
 		for _ in 0..n_ice {
@@ -272,7 +276,7 @@ impl Level {
 		}
 
 		match self.get_tile(pos).unwrap() {
-			Tile::Wall | Tile::HappyHome => return true,
+			Tile::Wall(_) => return true,
 			_ => (),
 		}
 
@@ -517,7 +521,7 @@ impl Level {
 			let mut modified_tile = false;
 			match (entity.kind, self.data.tiles[entity.x as usize + entity.y as usize * self.data.width]) {
 				(EntityKind::Human, Tile::Home) => {
-					self.data.tiles[entity.x as usize + entity.y as usize * self.data.width] = Tile::HappyHome;
+					self.data.tiles[entity.x as usize + entity.y as usize * self.data.width] = Tile::Wall(WallKind::HappyHome);
 					self.data.n_humans -= 1;
 					if self.data.n_humans == 0 {
 						self.has_won = true;
@@ -653,15 +657,93 @@ impl MoveEntity {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
+pub enum WallKind {
+	Void,
+	Grass,
+	Flowers,
+	HappyHome,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Tile {
 	Floor,
-	Wall,
+	Wall(WallKind),
 	SadHome,
 	Home,
-	HappyHome,
 	Ice,
 	FloorWithGoop,
 	IceWithGoop,
+}
+
+impl Tile {
+	pub fn graphics(self) -> [Option<TileGraphics>; 3] {
+		use Tile::*;
+		let mut values = [None; 3];
+
+		// The base tilemap.
+		values[0] = match self {
+			Floor | SadHome | Home | FloorWithGoop => 
+				Some(TileGraphics::Tilemap {
+					atlas: Texture::FloorMap,
+					connects_to_tile: |tile| match tile {
+						Wall(_) => false,
+						Ice => false,
+						IceWithGoop => false,
+						_ => true
+					},
+				}),
+			Wall(WallKind::Void) => Some(TileGraphics::Tilemap {
+				atlas: Texture::VoidMap,
+				connects_to_tile: |tile| match tile {
+					Wall(WallKind::Void) => false,
+					_ => true,
+				}
+			}),
+			Wall(WallKind::Grass) => unimplemented!(),
+			Wall(WallKind::Flowers) => unimplemented!(),
+			Wall(WallKind::HappyHome) => None,
+			Ice | IceWithGoop =>
+				Some(TileGraphics::Tilemap {
+					atlas: Texture::IceMap,
+					connects_to_tile: |tile| match tile {
+						Ice | IceWithGoop => true,
+						_ => false,
+					},
+				})
+		};
+
+		// The tile texture
+		values[1] = match self {
+			Wall(WallKind::HappyHome) => 
+				Some(TileGraphics::Texture(Texture::HappyHome)),
+			SadHome => Some(TileGraphics::Texture(Texture::SadHome)),
+			Home => Some(TileGraphics::Texture(Texture::Home)),
+			_ => None,
+		};
+		
+		// Goop layer
+		values[2] = match self {
+			IceWithGoop | FloorWithGoop => Some(TileGraphics::Tilemap {
+				atlas: Texture::GoopMap,
+				connects_to_tile: |tile| match tile {
+					IceWithGoop | FloorWithGoop => true,
+					_ => false
+				},
+			}),
+			_ => None,
+		};
+
+		values
+	}
+}
+
+#[derive(Clone, Copy)]
+pub enum TileGraphics {
+	Texture(Texture),
+	Tilemap {
+		atlas: Texture, 
+		connects_to_tile: fn(Tile) -> bool,
+	},
 }
 
 #[derive(Clone, Copy)]
