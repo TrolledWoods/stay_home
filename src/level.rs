@@ -542,7 +542,8 @@ impl Level {
 						from: anim_from, 
 						to: anim_to, 
 						accelerate: anim_accelerate, 
-						.. 
+						kind: AnimationMoveKind::Standard,
+						..
 					} = *animation {
 						if anim_to == from {
 							accelerate = anim_accelerate;
