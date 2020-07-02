@@ -30,6 +30,9 @@ make_textures! {
 	GoopMap: "goop_map.png",
 	IceMap: "ice_map.png",
 	VoidMap: "void_map.png",
+	Grass: "grass.png",
+	FlowerMap: "flower_map.png",
+	MossyMap: "mossy_map.png",
 }
 
 pub struct Textures {

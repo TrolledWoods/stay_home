@@ -87,7 +87,7 @@ impl Level {
 							Entity::new(x as isize, y as isize, EntityKind::Player));
 						level.player_id = level.entity_id_ctr;
 						level.entity_id_ctr += 1;
-						if char_.is_uppercase() { Tile::Ice } else { Tile::Floor }
+						if char_.is_uppercase() { Tile::Ice } else { Tile::Floor(FloorKind::Standard) }
 					}
 					'g' | 'G' => {
 						level.data.entities.insert(level.entity_id_ctr, 
@@ -100,16 +100,21 @@ impl Level {
 							Entity::new(x as isize, y as isize, EntityKind::Human));
 						level.entity_id_ctr += 1;
 						level.data.n_humans += 1;
-						if char_.is_uppercase() { Tile::Ice } else { Tile::Floor }
+						if char_.is_uppercase() { Tile::Ice } else { Tile::Floor(FloorKind::Standard) }
 					}
 					'c' | 'C' => {
 						level.data.entities.insert(level.entity_id_ctr, 
 							Entity::new(x as isize, y as isize, EntityKind::Cake));
 						level.entity_id_ctr += 1;
-						if char_.is_uppercase() { Tile::Ice } else { Tile::Floor }
+						if char_.is_uppercase() { Tile::Ice } else { Tile::Floor(FloorKind::Standard) }
 					}
-					'.' => Tile::Floor,
+
+					// Tiles
+					'.' => Tile::Floor(FloorKind::Standard),
+					',' => Tile::Floor(FloorKind::Mossy),
 					'#' => Tile::Wall(WallKind::Void),
+					':' => Tile::Wall(WallKind::Grass),
+					';' => Tile::Wall(WallKind::Flowers),
 					'H' => Tile::Home,
 					'S' => Tile::SadHome,
 					'%' => Tile::Ice,
@@ -142,7 +147,10 @@ impl Level {
 		let mut level: Level = Default::default();
 		level.data.tiles.width = width;
 		level.data.tiles.height = height;
-		level.data.tiles.buffer = vec![Tile::Floor; width * height];
+		level.data.tiles.buffer = vec![
+			Tile::Floor(FloorKind::Standard); 
+			width * height
+		];
 
 		let mut tiles = HashSet::new();
 		for x in 0..width {
@@ -449,7 +457,7 @@ impl Level {
 						self.data.tiles.set_tile(move_.to(), Tile::IceWithGoop);
 						self.n_tile_changes += 1;
 					}
-					Tile::Floor => {
+					Tile::Floor(_) => {
 						self.data.tiles.set_tile(move_.to(), Tile::FloorWithGoop);
 						self.n_tile_changes += 1;
 					}
@@ -695,6 +703,12 @@ impl MoveEntity {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
+pub enum FloorKind {
+	Standard,
+	Mossy,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum WallKind {
 	Void,
 	Grass,
@@ -704,7 +718,7 @@ pub enum WallKind {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Tile {
-	Floor,
+	Floor(FloorKind),
 	Wall(WallKind),
 	SadHome,
 	Home,
@@ -720,9 +734,19 @@ impl Tile {
 
 		// The base tilemap.
 		values[0] = match self {
-			Floor | SadHome | Home | FloorWithGoop => 
+			Floor(FloorKind::Standard) | SadHome | Home | FloorWithGoop => 
 				Some(TileGraphics::Tilemap {
 					atlas: Texture::FloorMap,
+					connects_to_tile: |tile| match tile {
+						Wall(_) => false,
+						Ice => false,
+						IceWithGoop => false,
+						_ => true
+					},
+				}),
+			Floor(FloorKind::Mossy) => 
+				Some(TileGraphics::Tilemap {
+					atlas: Texture::MossyMap,
 					connects_to_tile: |tile| match tile {
 						Wall(_) => false,
 						Ice => false,
@@ -737,8 +761,14 @@ impl Tile {
 					_ => true,
 				}
 			}),
-			Wall(WallKind::Grass) => unimplemented!(),
-			Wall(WallKind::Flowers) => unimplemented!(),
+			Wall(WallKind::Grass) => Some(TileGraphics::Texture(Texture::Grass)),
+			Wall(WallKind::Flowers) => Some(TileGraphics::Tilemap {
+				atlas: Texture::FlowerMap,
+				connects_to_tile: |tile| match tile {
+					Wall(WallKind::Flowers) => true,
+					_ => false,
+				}
+			}),
 			Wall(WallKind::HappyHome) => None,
 			Ice | IceWithGoop =>
 				Some(TileGraphics::Tilemap {
