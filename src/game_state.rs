@@ -159,7 +159,7 @@ impl LevelPlayer {
 			}
 		}
 
-		self.update_timer -= dt * 7.0;
+		self.update_timer -= dt * 5.0;
 
 		surface.clear_color(0.3, 0.3, 0.5, 1.0);
 		self.level_graphics.render_level(
@@ -172,7 +172,6 @@ impl LevelPlayer {
 		);
 
 		if self.update_timer <= 0.0 {
-
 			self.level_graphics.animations.clear();
 
 			if let Some(input) = self.cached_input.take() {

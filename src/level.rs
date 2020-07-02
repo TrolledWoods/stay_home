@@ -366,11 +366,13 @@ impl Level {
 					let other_pos = [other.x, other.y];
 					let me = self.data.entities.get_mut(&move_.entity_id).unwrap();
 					let me_pos = [me.x, me.y];
-					animations.push_back(Animation::Eat {
+					animations.push_back(Animation::Move {
 						from: me_pos,
 						to: other_pos,
-						eater: id,
-						eating: move_.entity_id,
+						entity_id: move_.entity_id,
+						accelerate: !me.is_sliding,
+						decelerate: true,
+						kind: AnimationMoveKind::Apply,
 					});
 					animations.push_back(Animation::Goopify { entity_id: id, kind: EntityKind::Human });
 					events.moves.remove(index);
@@ -387,23 +389,21 @@ impl Level {
 						// is on ice, then transfer the energy, don't push!
 						events.moves.remove(index);
 
-						animations.push_back(Animation::IceKick {
+						animations.push_back(Animation::Move {
 							entity_id: move_.entity_id,
 							from: [one_self.x, one_self.y],
 							to:   [entity.x,   entity.y  ],
+							accelerate: !one_self.is_sliding,
+							decelerate: true,
+							kind: AnimationMoveKind::IceKick,
 						});
 						let move_ = MoveEntity::new(
 							id,
 							[entity.x, entity.y],
 							move_.direction,
 						);
-						new_events.moves.push(move_);
+						events.moves.push(move_);
 					}
-					// (_, _) if !move_.is_friction_push => {
-					// 	// Cannot push things that are not on ice
-					// 	// while on ice.
-					// 	index += 1;
-					// }
 					(_, _) => {
 						// Just normal pushing
 						let move_ = MoveEntity {
@@ -423,7 +423,7 @@ impl Level {
 		}
 
 		if pushing_happened {
-			sounds.play(SoundId::Push, 0.1);
+			sounds.play(SoundId::Push, 0.4);
 		}
 
 		// TODO: Resolve move conflicts
@@ -432,14 +432,16 @@ impl Level {
 		// It's run in reverse because the moves resulting from pushing
 		// are always further back in the list, so if we reverse it those
 		// are moved first, which allows the pushers to also be moved.
-		for move_ in events.moves.drain(..).rev() {
+		for move_ in events.moves.iter().rev() {
 			let to = move_.to();
 
 			if self.tile_is_solid(to) {
+				let entity = self.data.entities.get(&move_.entity_id).unwrap();
 				animations.push_back(Animation::FailedMove {
 					entity_id: move_.entity_id,
 					from: move_.from,
 					to,
+					accelerate: !entity.is_sliding,
 				});
 				continue;
 			}
@@ -461,6 +463,7 @@ impl Level {
 							entity_id: move_.entity_id,
 							from: move_.from,
 							to,
+							accelerate: !entity.is_sliding,
 						});
 						continue;
 					}
@@ -492,50 +495,73 @@ impl Level {
 			entity.x = to[0];
 			entity.y = to[1];
 
-			if move_.is_friction_push {
-				animations.push_back(Animation::Move {
-					entity_id: move_.entity_id,
-					from: move_.from,
-					to,
-				});
-			}else {
-				animations.push_back(Animation::IceSlide {
-					entity_id: move_.entity_id,
-					from: move_.from,
-					to,
-				});
+			let mut moving_to_ice = false;
+			if self.data.tiles[to[0] as usize + to[1] as usize * self.data.width] == Tile::Ice {
+				moving_to_ice = true;
 			}
+
+			animations.push_back(Animation::Move {
+				entity_id: move_.entity_id,
+				from: move_.from,
+				to,
+				accelerate: !entity.is_sliding,
+				decelerate: !moving_to_ice,
+				kind: AnimationMoveKind::Standard,
+			});
+			entity.is_sliding = moving_to_ice;
 		}
 
-		// Tile modification
+		// Entities that modify tiles
 		let mut entities_to_remove = Vec::new();
 		for (&entity_id, entity) in self.data.entities.iter() {
+			let mut modified_tile = false;
 			match (entity.kind, self.data.tiles[entity.x as usize + entity.y as usize * self.data.width]) {
 				(EntityKind::Human, Tile::Home) => {
 					self.data.tiles[entity.x as usize + entity.y as usize * self.data.width] = Tile::HappyHome;
-					self.n_tile_changes += 1;
-					animations.push_back(Animation::TileModification {
-						entity_id,
-						at: [entity.x, entity.y],
-						new_tile: Tile::HappyHome,
-					});
 					self.data.n_humans -= 1;
 					if self.data.n_humans == 0 {
 						self.has_won = true;
 					}
-					entities_to_remove.push(entity_id);
+					modified_tile = true;
 				}
 				(EntityKind::Cake, Tile::SadHome) => {
 					self.data.tiles[entity.x as usize + entity.y as usize * self.data.width] = Tile::Home;
-					self.n_tile_changes += 1;
-					animations.push_back(Animation::TileModification {
-						entity_id,
-						at: [entity.x, entity.y],
-						new_tile: Tile::Home,
-					});
-					entities_to_remove.push(entity_id);
+					modified_tile = true;
 				}
 				_ => (),
+			}
+
+			if modified_tile {
+				self.n_tile_changes += 1;
+
+				let mut from = [entity.x, entity.y];
+				let to = [entity.x, entity.y];
+				let mut accelerate = false;
+				for (i, animation) in animations.iter().enumerate() {
+					if let Animation::Move { 
+						from: anim_from, 
+						to: anim_to, 
+						accelerate: anim_accelerate, 
+						.. 
+					} = *animation {
+						if anim_to == from {
+							accelerate = anim_accelerate;
+							from = anim_from;
+							animations.remove(i);
+							break;
+						}
+					}
+				}
+
+				animations.push_back(Animation::Move {
+					entity_id,
+					from,
+					to,
+					accelerate,
+					decelerate: false,
+					kind: AnimationMoveKind::Apply,
+				});
+				entities_to_remove.push(entity_id);
 			}
 		}
 
@@ -544,7 +570,7 @@ impl Level {
 		}
 
 		if self.data.has_input {
-			sounds.play(SoundId::SpiderWalk, 0.1);
+			sounds.play(SoundId::SpiderWalk, 0.3);
 			self.data.has_input = false;
 		}
 
@@ -554,21 +580,30 @@ impl Level {
 }
 
 #[derive(Clone, Copy)]
+pub enum AnimationMoveKind {
+	Standard,
+	IceKick,
+	Apply,
+}
+
+#[derive(Clone, Copy)]
 pub enum Animation {
-	// @Cleanup: Unify / Remove some of these, it feels as if some of
-	// them are redundant, or are used in contexts where they shouldn't.
-	Goopify				{ entity_id: u32, kind: EntityKind },
-	Eat {
-		from: [isize; 2],
+	Move { 
+		entity_id: u32, 
+		from: [isize; 2], 
 		to: [isize; 2],
-		eating: u32,
-		eater: u32,
+		accelerate: bool,
+		decelerate: bool,
+		kind: AnimationMoveKind,
 	},
-	Move				{ entity_id: u32, from: [isize; 2], to: [isize; 2] },
-	IceKick				{ entity_id: u32, from: [isize; 2], to: [isize; 2] },
-	IceSlide            { entity_id: u32, from: [isize; 2], to: [isize; 2] },
-	FailedMove			{ entity_id: u32, from: [isize; 2], to: [isize; 2] },
-	TileModification	{ entity_id: u32, at: [isize; 2], new_tile: Tile },
+	FailedMove { 
+		entity_id: u32, 
+		from: [isize; 2], 
+		to: [isize; 2], 
+		accelerate: bool,
+	},
+	// TODO: Add particles of goop when something is goopified
+	Goopify				{ entity_id: u32, kind: EntityKind },
 }
 
 #[derive(Clone, Default)]
@@ -634,11 +669,12 @@ pub struct Entity {
 	pub x: isize,
 	pub y: isize,
 	pub kind: EntityKind,
+	pub is_sliding: bool,
 }
 
 impl Entity {
 	pub fn new(x: isize, y: isize, kind: EntityKind) -> Self {
-		Entity { x, y, kind }
+		Entity { x, y, kind, is_sliding: false, }
 	}
 
 	pub fn goopify(&mut self) {

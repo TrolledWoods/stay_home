@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::level::{Tile, Animation};
+use crate::level::{Tile, Animation, AnimationMoveKind};
 use crate::graphics::{TextureVertex, Graphics};
 use crate::textures::{UVCoords, Texture as TextureId};
 use std::collections::{HashMap, VecDeque};
@@ -169,8 +169,10 @@ impl LevelGraphics {
 					entity_id,
 					from: [from_x, from_y],
 					to: [to_x, to_y],
+					accelerate, decelerate,
+					kind: AnimationMoveKind::Standard,
 				} => {
-					let t = (time *  time) * (3.0 - 2.0 * time);
+					let t = smooth_lerp_time(time, accelerate, decelerate);
 					let lerp_x = lerp(from_x as f32, to_x as f32, t);
 					let lerp_y = lerp(from_y as f32, to_y as f32, t);
 
@@ -178,12 +180,21 @@ impl LevelGraphics {
 					self.entities.get_mut(&entity_id).unwrap().position 
 						= [lerp_x, lerp_y];
 				}
-				Animation::IceSlide {
+				Animation::Move {
 					entity_id,
 					from: [from_x, from_y],
 					to: [to_x, to_y],
+					accelerate, decelerate,
+					kind: AnimationMoveKind::IceKick,
 				} => {
-					let t = time;
+					assert!(decelerate);
+
+					const FACTOR: f32 = 2.0;
+					let t = 
+						double_lerp(
+							(time * FACTOR).min(2.0), 
+							accelerate
+						) / FACTOR;
 					let lerp_x = lerp(from_x as f32, to_x as f32, t);
 					let lerp_y = lerp(from_y as f32, to_y as f32, t);
 
@@ -191,57 +202,43 @@ impl LevelGraphics {
 					self.entities.get_mut(&entity_id).unwrap().position 
 						= [lerp_x, lerp_y];
 				}
-				Animation::TileModification {
-					entity_id,
-					..
+				Animation::Move { 
+					entity_id, 
+					from: [from_x, from_y], 
+					to: [to_x, to_y],
+					kind: AnimationMoveKind::Apply,
+					accelerate, decelerate,
 				} => {
-					let t = (time * time) * (3.0 - 2.0 * time);
-
-					// @Cleanup: Don't unwrap here, dummy!
+					let t = smooth_lerp_time(time, accelerate, decelerate);
 					let mut entity =
 						self.entities.get_mut(&entity_id).unwrap();
+					entity.position[0] = lerp(from_x as f32, to_x as f32, t);
+					entity.position[1] = lerp(from_y as f32, to_y as f32, t);
 					entity.size = 1.0 - t;
 				}
-				Animation::IceKick {
-					entity_id,
-					from: [from_x, from_y],
-					to: [to_x, to_y],
-				} => {
-					let mut t = (time * time) * (3.0 - 2.0 * time);
-					t = (0.5 - (t - 0.5).abs()) * 1.3;
-					let lerp_x = lerp(from_x as f32, to_x as f32, t);
-					let lerp_y = lerp(from_y as f32, to_y as f32, t);
 
-					// @Cleanup: Don't unwrap here, dummy!
-					self.entities.get_mut(&entity_id).unwrap().position 
-						= [lerp_x, lerp_y];
-				}
 				Animation::FailedMove {
 					entity_id,
 					from: [from_x, from_y],
 					to: [to_x, to_y],
+					accelerate,
 				} => {
-					let mut t = (time * time) * (3.0 - 2.0 * time);
-					t = (0.5 - (t - 0.5).abs()) * 0.2;
+					let factor: f32 = if accelerate {
+						2.0
+					} else {
+						4.0
+					};
+					let t = 
+						double_lerp(
+							(time * factor).min(2.0), 
+							accelerate
+						) / 5.0;
 					let lerp_x = lerp(from_x as f32, to_x as f32, t);
 					let lerp_y = lerp(from_y as f32, to_y as f32, t);
 
 					// @Cleanup: Don't unwrap here, dummy!
 					self.entities.get_mut(&entity_id).unwrap().position 
 						= [lerp_x, lerp_y];
-				}
-				Animation::Eat { 
-					eating, 
-					from: [from_x, from_y], 
-					to: [to_x, to_y],
-					..
-				} => {
-					let t = (time * time) * (3.0 - 2.0 * time);
-					let mut entity =
-						self.entities.get_mut(&eating).unwrap();
-					entity.position[0] = lerp(from_x as f32, to_x as f32, t);
-					entity.position[1] = lerp(from_y as f32, to_y as f32, t);
-					entity.size = 1.0 - t;
 				}
 				Animation::Goopify { entity_id, kind } => {
 					let gfx = self.entities.get_mut(&entity_id).unwrap();
@@ -462,6 +459,26 @@ fn generate_level_graphics(
 			&indices,
 		).unwrap(),
 	)
+}
+
+/// A function where 0 <= t <= 2, 0 and 2 will give 0.
+#[inline]
+fn double_lerp(t: f32, accelerate: bool) -> f32 {
+	if t < 1.0 {
+		smooth_lerp_time(t, accelerate, true)
+	}else {
+		1.0 - smooth_lerp_time(t - 1.0, true, true)
+	}
+}
+
+#[inline]
+fn smooth_lerp_time(t: f32, accelerate: bool, decelerate: bool) -> f32 {
+	match (accelerate, decelerate) {
+		(false, false) => t,
+		(true, false)  => -t * t * t + 2.0 * t * t,
+		(false, true)  => 1.0 - smooth_lerp_time(1.0 - t, true, false),
+		(true, true)   => 3.0 * t * t - 2.0 * t * t * t,
+	}
 }
 
 /// Pass a graphics, a position rectangle, atlas coordinates and the surrounding
