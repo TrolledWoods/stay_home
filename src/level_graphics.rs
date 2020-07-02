@@ -388,7 +388,7 @@ fn generate_level_graphics(
 					Tile::Floor => None,
 					Tile::Ice => unreachable!(),
 					Tile::Home => Some(TextureId::Home),
-					Tile::Wall => Some(TextureId::Wall),
+					Tile::Wall => None,
 					Tile::HappyHome => Some(TextureId::HappyHome),
 					Tile::SadHome => Some(TextureId::SadHome),
 					Tile::FloorWithGoop => None,

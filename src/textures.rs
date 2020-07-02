@@ -16,7 +16,6 @@ macro_rules! make_textures {
 }
 
 make_textures! {
-	Wall: "wall.png",
 	Home: "home.png",
 	Human: "human.png",
 	VictoryText: "victory_text.png",
