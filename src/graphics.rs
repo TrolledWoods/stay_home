@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::textures::{Textures, Texture as TextureId, UVCoords};
+use crate::textures::{Textures, UVCoords};
 use crate::sounds::Sounds;
 
 pub struct Graphics {
@@ -25,60 +25,60 @@ impl Graphics {
 		}
 	}
 
-	pub fn draw_texture_immediate(&self, surface: &mut impl Surface, aspect: f32, rect: [f32; 4], texture: TextureId) {
-		let uv = self.textures.get_uv(texture);
-		let vertices = VertexBuffer::new(&self.display,
-			&[TextureVertex {
-				position: [rect[0], rect[1], 1.0],
-				uv: [uv.left, uv.bottom],
-			},
-			TextureVertex {
-				position: [rect[0], rect[3], 1.0],
-				uv: [uv.left, uv.top],
-			},
-			TextureVertex {
-				position: [rect[2], rect[3], 1.0],
-				uv: [uv.right, uv.top],
-			},
-			TextureVertex {
-				position: [rect[2], rect[1], 1.0],
-				uv: [uv.right, uv.bottom],
-			}]
-		).unwrap();
-		let indices = IndexBuffer::new(&self.display,
-			index::PrimitiveType::TrianglesList,
-			&[0, 1, 2, 0, 2, 3u32],
-		).unwrap();
+	// pub fn draw_texture_immediate(&self, surface: &mut impl Surface, aspect: f32, rect: [f32; 4], texture: TextureId) {
+	// 	let uv = self.textures.get_uv(texture);
+	// 	let vertices = VertexBuffer::new(&self.display,
+	// 		&[TextureVertex {
+	// 			position: [rect[0], rect[1], 1.0],
+	// 			uv: [uv.left, uv.bottom],
+	// 		},
+	// 		TextureVertex {
+	// 			position: [rect[0], rect[3], 1.0],
+	// 			uv: [uv.left, uv.top],
+	// 		},
+	// 		TextureVertex {
+	// 			position: [rect[2], rect[3], 1.0],
+	// 			uv: [uv.right, uv.top],
+	// 		},
+	// 		TextureVertex {
+	// 			position: [rect[2], rect[1], 1.0],
+	// 			uv: [uv.right, uv.bottom],
+	// 		}]
+	// 	).unwrap();
+	// 	let indices = IndexBuffer::new(&self.display,
+	// 		index::PrimitiveType::TrianglesList,
+	// 		&[0, 1, 2, 0, 2, 3u32],
+	// 	).unwrap();
 
-		surface.draw(
-			&vertices,
-			&indices,
-			&self.world_texture_program,
-			&uniform! {
-				model_transform: [
-					[1.0, 0.0, 0.0f32],
-					[0.0, 1.0, 0.0f32],
-					[0.0, 0.0, 1.0f32],
-				],
-				camera_transform: [
-					[1.0 / aspect, 0.0, 0.0f32],
-					[0.0, 1.0, 0.0f32],
-					[0.0, 0.0, 1.0f32],
-				],
-				atlas: self.textures.atlas.sampled().magnify_filter(uniforms::MagnifySamplerFilter::Nearest),
-			},
-			&DrawParameters {
-				blend: Blend {
-					color: BlendingFunction::Addition {
-						source: LinearBlendingFactor::One,
-						destination: LinearBlendingFactor::OneMinusSourceAlpha,
-					},
-					..Default::default()
-				},
-				..Default::default()
-			}
-		).unwrap();
-	}
+	// 	surface.draw(
+	// 		&vertices,
+	// 		&indices,
+	// 		&self.world_texture_program,
+	// 		&uniform! {
+	// 			model_transform: [
+	// 				[1.0, 0.0, 0.0f32],
+	// 				[0.0, 1.0, 0.0f32],
+	// 				[0.0, 0.0, 1.0f32],
+	// 			],
+	// 			camera_transform: [
+	// 				[1.0 / aspect, 0.0, 0.0f32],
+	// 				[0.0, 1.0, 0.0f32],
+	// 				[0.0, 0.0, 1.0f32],
+	// 			],
+	// 			atlas: self.textures.atlas.sampled().magnify_filter(uniforms::MagnifySamplerFilter::Nearest),
+	// 		},
+	// 		&DrawParameters {
+	// 			blend: Blend {
+	// 				color: BlendingFunction::Addition {
+	// 					source: LinearBlendingFactor::One,
+	// 					destination: LinearBlendingFactor::OneMinusSourceAlpha,
+	// 				},
+	// 				..Default::default()
+	// 			},
+	// 			..Default::default()
+	// 		}
+	// 	).unwrap();
+	// }
 
 	pub fn push_texture_quad(&self, 
 		vertices: &mut Vec<TextureVertex>,

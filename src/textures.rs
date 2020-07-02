@@ -18,7 +18,6 @@ macro_rules! make_textures {
 make_textures! {
 	Home: "home.png",
 	Human: "human.png",
-	VictoryText: "victory_text.png",
 	HappyHome: "happy_home.png",
 	Cake: "cake.png",
 	SadHome: "sad_home.png",

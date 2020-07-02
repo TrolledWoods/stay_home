@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use crate::level::{Tile, Animation, AnimationMoveKind, WallKind, TileGraphics};
 use crate::graphics::{TextureVertex, Graphics};
-use crate::textures::{UVCoords, Texture as TextureId};
+use crate::textures::UVCoords;
 use std::collections::{HashMap, VecDeque};
 
 pub struct LevelGraphics {
@@ -13,8 +13,6 @@ pub struct LevelGraphics {
 	pub animations: VecDeque<Animation>,
 
 	entities: HashMap<u32, EntityGraphics>,
-
-	win_panel_position: f32,
 }
 
 impl LevelGraphics {
@@ -60,7 +58,6 @@ impl LevelGraphics {
 			indices,
 			entities,
 			animations: VecDeque::new(),
-			win_panel_position: 0.0,
 			tilemap_change: level.n_tile_changes,
 		}
 	}
@@ -112,8 +109,8 @@ impl LevelGraphics {
 		surface: &mut impl Surface, 
 		aspect: f32,
 		level: &mut Level,
+		camera_offset: [f32; 2],
 		time: f32,
-		dt: f32,
 	) {
 		let size = if (level.height() as f32) > (level.width() as f32 / aspect) {
 			1.0 / level.height() as f32
@@ -123,7 +120,7 @@ impl LevelGraphics {
 		let camera_matrix = [
 			[1.5 * size / aspect, 0.0, 0.0f32],
 			[0.0, 1.5 * size, 0.0f32],
-			[0.0, 0.0, 1.0f32],
+			[camera_offset[0] * 2.0 * aspect, camera_offset[1] * 2.0, 1.0f32],
 		];
 
 		let model_transform = [
@@ -296,27 +293,6 @@ impl LevelGraphics {
 				}
 			).unwrap();
 		}
-
-		if level.has_won {
-			self.win_panel_position = 
-				1.0f32.min(self.win_panel_position + dt * 4.0);
-		}else {
-			self.win_panel_position = 
-				0.0f32.max(self.win_panel_position - dt * 4.0);
-		};
-
-		if self.win_panel_position > 0.05 {
-			let t = 1.0 - self.win_panel_position;
-			let t = 1.0 - (t * t);
-
-			let panel_y = lerp(-2.0, 0.0, t);
-			graphics.draw_texture_immediate(
-				surface, 
-				aspect, 
-				[-1.0, panel_y - 0.25, 1.0, panel_y + 0.25], 
-				TextureId::VictoryText,
-			);
-		}
 	}
 }
 
@@ -376,7 +352,7 @@ fn double_lerp(t: f32, accelerate: bool) -> f32 {
 }
 
 #[inline]
-fn smooth_lerp_time(t: f32, accelerate: bool, decelerate: bool) -> f32 {
+pub fn smooth_lerp_time(t: f32, accelerate: bool, decelerate: bool) -> f32 {
 	match (accelerate, decelerate) {
 		(false, false) => t,
 		(true, false)  => -t * t * t + 2.0 * t * t,
