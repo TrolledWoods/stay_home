@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use crate::level_graphics::smooth_lerp_time;
+use crate::textures::UVCoords;
 use std::path::PathBuf;
 use std::fs;
 
@@ -47,6 +48,7 @@ pub struct LevelPlayer {
 	hot_load_timer: f32,
 	previous_load: std::time::SystemTime,
 	update_timer: f32,
+	time: f32,
 }
 
 impl LevelPlayer {
@@ -74,6 +76,7 @@ impl LevelPlayer {
 			hot_load_timer: 0.0,
 			previous_load: std::time::SystemTime::now(),
 			update_timer: 0.0,
+			time: 0.0,
 		})
 	}
 
@@ -154,6 +157,8 @@ impl LevelPlayer {
 		aspect: f32,
 		dt: f32,
 	) -> Result<(), String> {
+		self.time += dt;
+
 		if self.level.has_won {
 			if self.current_level < self.levels.len() - 1 {
 				self.current_level += 1;
@@ -202,6 +207,19 @@ impl LevelPlayer {
 			}
 		}
 
+		graphics.draw_background_immediate(
+			surface,
+			aspect,
+			[-1.0, -1.0, 2.0, 2.0],
+			UVCoords {
+				left: -100.0 * aspect,
+				right: 100.0 * aspect,
+				bottom: -100.0,
+				top: 100.0,
+			},
+			self.time
+		);
+
 		if let Some((ref mut time, ref mut next_level_graphics, ref mut prev_level, [move_x, move_y])) 
 			= self.next_level_graphics 
 		{
@@ -212,7 +230,6 @@ impl LevelPlayer {
 			self.update_timer -= dt * lerp(0.0, 6.0, *time);
 
 			let offset = smooth_lerp_time(*time, true, true);
-			surface.clear_color(0.3, 0.3, 0.5, 1.0);
 			self.level_graphics.render_level(
 				&graphics, 
 				surface, 
@@ -238,7 +255,6 @@ impl LevelPlayer {
 
 		self.update_timer -= dt * 6.0;
 
-		surface.clear_color(0.3, 0.3, 0.5, 1.0);
 		self.level_graphics.render_level(
 			&graphics, 
 			surface, 
