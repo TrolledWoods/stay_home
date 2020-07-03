@@ -84,7 +84,7 @@ impl Graphics {
 	// 	).unwrap();
 	// }
 	
-	pub fn draw_background_immediate(&self, surface: &mut impl Surface, aspect: f32, rect: [f32; 4], uv: UVCoords, time: f32) {
+	pub fn draw_background_immediate(&self, surface: &mut impl Surface, rect: [f32; 4], uv: UVCoords, time: f32) {
 		let vertices = VertexBuffer::new(&self.display,
 			&[BackgroundVertex {
 				position: [rect[0], rect[1], 1.0],

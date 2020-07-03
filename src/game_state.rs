@@ -209,7 +209,6 @@ impl LevelPlayer {
 
 		graphics.draw_background_immediate(
 			surface,
-			aspect,
 			[-1.0, -1.0, 2.0, 2.0],
 			UVCoords {
 				left: -100.0 * aspect,
