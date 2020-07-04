@@ -9,8 +9,8 @@ CakeWithGoop	; texture	; assets/cake_with_goop.png
 BucketOfGoop	; texture	; assets/bucket_of_goop.png
 Grass		; texture	; assets/grass.png
 FloorMap	; map		; assets/floor_map/
-GoopMap		; map		; assets/floor_map/
-IceMap		; map		; assets/floor_map/
-VoidMap		; map		; assets/floor_map/
-FlowerMap	; map		; assets/floor_map/
-MossyMap	; map		; assets/floor_map/
+GoopMap		; map		; assets/goop_map/
+IceMap		; map		; assets/ice_map/
+VoidMap		; map		; assets/void_map/
+FlowerMap	; map		; assets/flower_map/
+MossyMap	; map		; assets/mossy_map/
