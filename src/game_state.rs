@@ -248,6 +248,7 @@ impl LevelPlayer {
 			);
 
 			if *time < 0.0 {
+				self.cached_input = None;
 				self.level_graphics = self.next_level_graphics.take().unwrap().1;
 			}
 			return Ok(());

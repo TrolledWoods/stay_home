@@ -189,13 +189,13 @@ in vec2 out_uv;
 void main() {
 	float x = floor(out_uv.x);
 	float y = floor(out_uv.y);
-	float real_c = (x + y + sin(out_time * 0.1)) / 32.0;
+	float real_c = (x + y + 10.0 * sin(out_time * 0.1)) / 32.0;
 	
-	float colors = 2.0;
+	float colors = 3.0;
 	float floor_c = floor(real_c * colors) / colors;
 	float error_c = floor((real_c - floor_c) * 50.0) / 50.0;
 	float c = floor_c + floor(mod(x * 13.0 - y * 11.0, 1.0 + error_c) * colors) / colors;
-	gl_FragColor = vec4(c / 70.0 + 0.2, c / 70.0 + 0.2, c / 60.0 + 0.3, 1.0);
+	gl_FragColor = vec4(c / 70.0 + 0.15, c / 60.0 + 0.18, c / 90.0 + 0.20, 1.0);
 }
 "##;
 
