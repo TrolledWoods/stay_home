@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use crate::level::{Tile, Animation, AnimationMoveKind, WallKind, TileGraphics};
 use crate::graphics::{TextureVertex, Graphics};
-use crate::textures::UVCoords;
+use crate::textures::{UVCoords, Texture};
 use std::collections::{HashMap, VecDeque};
 
 pub struct LevelGraphics {
@@ -25,19 +25,19 @@ impl LevelGraphics {
 			let vertices = VertexBuffer::new(&graphics.display,
 				&[TextureVertex {
 					position: [-0.5, -0.5, 1.0],
-					uv: [uv.left, uv.bottom],
+					uv: [uv.left, uv.bottom, uv.texture],
 				},
 				TextureVertex {
 					position: [-0.5, 0.5, 1.0],
-					uv: [uv.left, uv.top],
+					uv: [uv.left, uv.top, uv.texture],
 				},
 				TextureVertex {
 					position: [0.5, 0.5, 1.0],
-					uv: [uv.right, uv.top],
+					uv: [uv.right, uv.top, uv.texture],
 				},
 				TextureVertex {
 					position: [0.5, -0.5, 1.0],
-					uv: [uv.right, uv.bottom],
+					uv: [uv.right, uv.bottom, uv.texture],
 				}]
 			).unwrap();
 			let indices = IndexBuffer::new(&graphics.display,
@@ -72,19 +72,19 @@ impl LevelGraphics {
 			let vertices = VertexBuffer::new(&graphics.display,
 				&[TextureVertex {
 					position: [-0.5, -0.5, 1.0],
-					uv: [uv.left, uv.bottom],
+					uv: [uv.left, uv.bottom, uv.texture],
 				},
 				TextureVertex {
 					position: [-0.5, 0.5, 1.0],
-					uv: [uv.left, uv.top],
+					uv: [uv.left, uv.top, uv.texture],
 				},
 				TextureVertex {
 					position: [0.5, 0.5, 1.0],
-					uv: [uv.right, uv.top],
+					uv: [uv.right, uv.top, uv.texture],
 				},
 				TextureVertex {
 					position: [0.5, -0.5, 1.0],
-					uv: [uv.right, uv.bottom],
+					uv: [uv.right, uv.bottom, uv.texture],
 				}]
 			).unwrap();
 			let indices = IndexBuffer::new(&graphics.display,
@@ -244,19 +244,19 @@ impl LevelGraphics {
 					gfx.vertex_buffer = VertexBuffer::new(&graphics.display,
 						&[TextureVertex {
 							position: [-0.5, -0.5, 1.0],
-							uv: [uv.left, uv.bottom],
+							uv: [uv.left, uv.bottom, uv.texture],
 						},
 						TextureVertex {
 							position: [-0.5, 0.5, 1.0],
-							uv: [uv.left, uv.top],
+							uv: [uv.left, uv.top, uv.texture],
 						},
 						TextureVertex {
 							position: [0.5, 0.5, 1.0],
-							uv: [uv.right, uv.top],
+							uv: [uv.right, uv.top, uv.texture],
 						},
 						TextureVertex {
 							position: [0.5, -0.5, 1.0],
-							uv: [uv.right, uv.bottom],
+							uv: [uv.right, uv.bottom, uv.texture],
 						}]
 					).unwrap();
 					gfx.index_buffer = IndexBuffer::new(&graphics.display,
@@ -385,11 +385,10 @@ fn generate_tile_graphics(
 						.unwrap_or(false);
 				}
 			}
-			let uv = graphics.textures.get_uv(atlas);
 			generate_tilemap_tile_graphics(
 				graphics,
 				pos,
-				uv,
+				atlas,
 				data,
 				vertices,
 				indices,
@@ -420,7 +419,7 @@ fn generate_tile_graphics(
 fn generate_tilemap_tile_graphics(
 	graphics: &Graphics,
 	pos: [f32; 4],
-	atlas_coords: UVCoords,
+	texture_id: Texture,
 	data: [bool; 9],
 	vertices: &mut Vec<TextureVertex>,
 	indices: &mut Vec<u32>,
@@ -428,53 +427,37 @@ fn generate_tilemap_tile_graphics(
 	let mut add_quad = move |
 		uv: UVCoords,
 		pos: [f32; 4],
-		horizontal: bool,
-		vertical: bool,
-		diagonal: bool,
 	| {
-		let offset = 2.0 *
-			(if horizontal { 4.0 } else { 0.0 } + 
-			 if vertical   { 2.0 } else { 0.0 } +
-			 if diagonal   { 1.0 } else { 0.0 });
 		graphics.push_texture_quad(
 			vertices,
 			indices,
 			pos,
-			uv.relative(offset, 0.0, offset + 1.0, 1.0),
+			uv,
 		);
 	};
 
-	let atlas_coords = atlas_coords.relative(0.0, 0.0, 1.0 / 8.0, 1.0);
+	let atlas_coords = graphics.textures.get_tilemap_uv(texture_id, data[3], data[1], data[0]);
 	// Bottom left
 	add_quad(
 		atlas_coords.relative(0.0, 0.0, 0.5, 0.5),
 		[pos[0], pos[1], pos[2] / 2.0, pos[3] / 2.0],
-		data[3],
-		data[1],
-		data[0],
 	);
 	// Bottom right
+	let atlas_coords = graphics.textures.get_tilemap_uv(texture_id, data[5], data[1], data[2]);
 	add_quad(
 		atlas_coords.relative(0.5, 0.0, 1.0, 0.5),
 		[pos[0] + pos[2] / 2.0, pos[1], pos[2] / 2.0, pos[3] / 2.0],
-		data[5],
-		data[1],
-		data[2],
 	);
 	// Top right
+	let atlas_coords = graphics.textures.get_tilemap_uv(texture_id, data[5], data[7], data[8]);
 	add_quad(
 		atlas_coords.relative(0.5, 0.5, 1.0, 1.0),
 		[pos[0] + pos[2] / 2.0, pos[1] + pos[3] / 2.0, pos[2] / 2.0, pos[3] / 2.0],
-		data[5],
-		data[7],
-		data[8],
 	);
 	// Top left
+	let atlas_coords = graphics.textures.get_tilemap_uv(texture_id, data[3], data[7], data[6]);
 	add_quad(
 		atlas_coords.relative(0.0, 0.5, 0.5, 1.0),
 		[pos[0], pos[1] + pos[3] / 2.0, pos[2] / 2.0, pos[3] / 2.0],
-		data[3],
-		data[7],
-		data[6],
 	);
 }

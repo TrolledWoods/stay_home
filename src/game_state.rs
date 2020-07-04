@@ -215,6 +215,7 @@ impl LevelPlayer {
 				right: 100.0 * aspect,
 				bottom: -100.0,
 				top: 100.0,
+				texture: 0.0,
 			},
 			self.time
 		);

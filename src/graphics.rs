@@ -18,7 +18,7 @@ impl Graphics {
 		let background_program = Program::from_source(display, BACKGROUND_VERTEX_SHADER, BACKGROUND_FRAGMENT_SHADER, None).unwrap();
 
 		// @Cleanup: Don't unwrap here, silly!
-		let textures = Textures::load("assets/", &display).unwrap();
+		let textures = Textures::load("assets.txt", &display).unwrap();
 
 		Graphics {
 			sounds,
@@ -130,19 +130,19 @@ impl Graphics {
 		let vert_index = vertices.len() as u32;
 		vertices.push(TextureVertex {
 			position: [pos[0] as f32, pos[1] as f32, 1.0],
-			uv: [uv.left, uv.bottom],
+			uv: [uv.left, uv.bottom, uv.texture],
 		});
 		vertices.push(TextureVertex {
 			position: [pos[0] as f32, pos[1] as f32 + pos[3], 1.0],
-			uv: [uv.left, uv.top],
+			uv: [uv.left, uv.top, uv.texture],
 		});
 		vertices.push(TextureVertex {
 			position: [pos[0] as f32 + pos[2], pos[1] as f32 + pos[3], 1.0],
-			uv: [uv.right, uv.top],
+			uv: [uv.right, uv.top, uv.texture],
 		});
 		vertices.push(TextureVertex {
 			position: [pos[0] as f32 + pos[2], pos[1] as f32, 1.0],
-			uv: [uv.right, uv.bottom],
+			uv: [uv.right, uv.bottom, uv.texture],
 		});
 
 		indices.push(vert_index);
@@ -202,7 +202,7 @@ void main() {
 #[derive(Clone, Copy)]
 pub struct TextureVertex {
 	pub position: [f32; 3],
-	pub uv: [f32; 2],
+	pub uv: [f32; 3],
 }
 
 implement_vertex!(TextureVertex, position, uv);
@@ -214,8 +214,8 @@ uniform mat3 model_transform;
 uniform mat3 camera_transform;
 
 in vec3 position;
-in vec2 uv;
-out vec2 out_uv;
+in vec3 uv;
+out vec3 out_uv;
 
 void main() {
 	out_uv = uv;
@@ -226,9 +226,9 @@ void main() {
 const TEXTURE_FRAGMENT_SHADER: &str = r##"
 #version 130
 
-uniform sampler2D atlas;
+uniform sampler2DArray atlas;
 
-in vec2 out_uv;
+in vec3 out_uv;
 
 void main() {
 	gl_FragColor = texture(atlas, out_uv);

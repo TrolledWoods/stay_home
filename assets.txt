@@ -1,0 +1,16 @@
+Home		; texture	; assets/home.png
+Human		; texture	; assets/human.png
+HappyHome	; texture	; assets/happy_home.png
+Cake		; texture	; assets/cake.png
+SadHome		; texture	; assets/sad_home.png
+Player		; texture	; assets/player.png
+HumanWithGoop	; texture	; assets/human_with_goop.png
+CakeWithGoop	; texture	; assets/cake_with_goop.png
+BucketOfGoop	; texture	; assets/bucket_of_goop.png
+Grass		; texture	; assets/grass.png
+FloorMap	; map		; assets/floor_map/
+GoopMap		; map		; assets/floor_map/
+IceMap		; map		; assets/floor_map/
+VoidMap		; map		; assets/floor_map/
+FlowerMap	; map		; assets/floor_map/
+MossyMap	; map		; assets/floor_map/
